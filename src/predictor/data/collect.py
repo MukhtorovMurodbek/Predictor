@@ -224,11 +224,13 @@ def _public_batch_to_rows(batch: list[dict]) -> list[dict]:
 
 def collect_public(
     api: OpenDota, calls: int, min_rank: int | None, save_every: int = 50, stop_at_id: int | None = None,
-    min_quota: int = 0, start_before: int | None = None,
+    min_quota: int = 0, start_before: int | None = None, on_page=None,
 ) -> int:
     """Page backwards through /publicMatches, newest first (or from `start_before`). Each call
     returns up to 100 matches. Stops early at match `stop_at_id` (already saved) or when fewer
-    than `min_quota` calls are left today. Returns the number of API calls made."""
+    than `min_quota` calls are left today. `on_page`, when supplied, receives each non-empty
+    raw page before filtering so callers can track pagination even without eligible matches.
+    Returns the number of API calls made."""
     cursor, rows, total, made = start_before, [], 0, 0
 
     def flush():
@@ -250,6 +252,8 @@ def collect_public(
             if not batch:
                 break
             cursor = min(m["match_id"] for m in batch)
+            if on_page is not None:
+                on_page(batch)
             if stop_at_id is not None:
                 batch = [m for m in batch if m["match_id"] > stop_at_id]
             rows.extend(_public_batch_to_rows(batch))

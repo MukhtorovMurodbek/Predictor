@@ -97,7 +97,9 @@ Each phase ends with something that works and that we can demo. Do them in order
   heroes' usual win rates predict (like Dotabuff's advantage). Pairs under 200 games are hidden.
 - `counterpick/update.py`, run by the bot **every hour**: fetch new public games (all ranks),
   backfill older games until the 90-day window is full, add them to the daily tables, and keep
-  only 7 days of raw games. Leaves 400 OpenDota calls/day for the other models.
+  up to 60 days of raw games for `/apick`. Previously pruned raw games are recovered when
+  the same call budget has capacity after forward collection. Leaves 400 OpenDota calls/day
+  for the other models.
 - The old trained counter model was removed.
 - Check vs Dotabuff (Phantom Lancer, after one day of data): 8 of our top 10 counters are in
   Dotabuff's top 14 (Tidehunter, Axe, Timbersaw, Underlord, Sand King, Warlock, CM, Sven).

@@ -21,12 +21,13 @@ _Last updated: 2026-11-01 (evening)_
 
 ## 1. Counter-picker (public games) 👤 Asilbek (Codex + website)
 - ✅ Now plain statistics, no model: win rates per hero pair, last 90 days, like Dotabuff
-- ✅ Updates itself every hour (new games + backfill), only 7 days of raw games kept
+- ✅ Updates itself every hour (new games + backfill); raw retention is 60 days
 - ✅ Hosted in the bot: `/counterpick` `/pick` `/counters` `/hero`
 - ✅ Phantom Lancer check: 8 of our top 10 counters are in Dotabuff's top 14
 - 🔨 Data growing: 79 k games on day 1, up to ~200 k/day
 - ✅ Asilbek's website version: average win rate vs the enemies, rank and patch filters → [setup](docs/COUNTERPICK-WEB.md)
 - ✅ Asilbek's version also in the bot: `/asil` `/apick` (same data, his ranking rules)
+- 🔨 `/apick` uses up to the last 60 days; older raw history backfills when the API budget allows
 - 🔨 Asilbek: STRATZ connection test on branch `feat/stratz-connection-latest` (not merged yet)
 - ⬜ Rank brackets in the 90-day tables, personal hero pool, roles
 

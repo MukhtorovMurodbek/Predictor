@@ -10,6 +10,7 @@ import html
 import re
 from datetime import datetime, timezone
 
+import pandas as pd
 from telegram import Update
 from telegram.ext import ContextTypes
 
@@ -22,6 +23,7 @@ SUMMARY = "his website's ranking: best average win rate vs the enemies, rank fil
 
 # avg_rank_tier = 10 * medal + stars (Herald 1x ... Divine 7x, Immortal 80)
 MEDALS = {"herald": 1, "guardian": 2, "crusader": 3, "archon": 4, "legend": 5, "ancient": 6, "divine": 7, "immortal": 8}
+WINDOW_DAYS = 60
 RANK = re.compile(r"\brank\s+([a-z]+|\d+)(?:\s*[-–]\s*([a-z]+|\d+))?", re.IGNORECASE)
 PATCH = re.compile(r"\bpatch\s+(\d+\.\d+[a-z]?)", re.IGNORECASE)
 
@@ -33,27 +35,38 @@ HELP = f"""<b>🧩 Asilbek's counter-picker</b> (the website version)
 Optional filters: <code>rank herald</code>, <code>rank crusader-legend</code>, <code>rank immortal</code> (the game's average rank), <code>patch 7.41</code>.
 Allies and bans are only left out of the suggestions; they don't change the scores.
 Heroes with at least {MIN_MATCHES_PER_OPPONENT} games against every enemy come first; the others are marked ⚠.
-Uses the public games of the last 7 days. The other counter-picker, /counterpick, uses 90 days and Dotabuff-style edges."""
+Uses available public games from up to the last {WINDOW_DAYS} days; history may be incomplete. The other counter-picker, /counterpick, uses 90 days and Dotabuff-style edges."""
 
 
 def help_text() -> str:
     return HELP
 
 
-_cache: dict = {"key": None, "matches": None, "counts": {}}
+_cache: dict = {"key": None, "window": None, "matches": None, "counts": {}}
+
+
+def _window_end() -> int:
+    """Refresh the rolling window once a minute, including only completed UTC minutes."""
+    return int(datetime.now(timezone.utc).timestamp() // 60) * 60
 
 
 def _counts(rank_min, rank_max, patch):
-    """Pair counts for these filters, recomputed when new games arrive (hourly)."""
+    """Count the available recent games; invalidate when the data or window changes."""
     path = SOURCES["public"]
     if not path.exists():
         return None
     key = path.stat().st_mtime_ns
     if _cache["key"] != key:
         _cache.update(key=key, matches=load_matches("public"), counts={})
+    end = _window_end()
+    if _cache["window"] != end:
+        _cache.update(window=end, counts={})
     f = (rank_min, rank_max, patch)
     if f not in _cache["counts"]:
-        _cache["counts"][f] = pair_counts(_cache["matches"], *f)
+        matches = _cache["matches"]
+        times = pd.to_numeric(matches["start_time"], errors="coerce")
+        recent = matches[(times >= end - WINDOW_DAYS * 86400) & (times <= end)]
+        _cache["counts"][f] = pair_counts(recent, *f)
     return _cache["counts"][f]
 
 
@@ -139,7 +152,8 @@ async def apick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         lines.append("<i>No hero has games against these enemies yet.</i>")
     lines += [
         "",
-        f"<i>{counts.eligible:,} public games ({_date(counts.oldest)} to {_date(counts.newest)}). "
+        f"<i>{counts.eligible:,} available public games ({_date(counts.oldest)} to {_date(counts.newest)} UTC; "
+        f"up to last {WINDOW_DAYS} days; coverage may be incomplete). "
         f"⚠ = fewer than {MIN_MATCHES_PER_OPPONENT} games against some enemy. Rank = the game's average rank.</i>",
     ]
     await update.effective_message.reply_text("\n".join(lines))
