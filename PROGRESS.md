@@ -23,7 +23,7 @@ _Last updated: 2026-11-01 (late night)_
 - ✅ Now plain statistics, no model: win rates per hero pair, last 90 days, like Dotabuff
 - ✅ Every public game OpenDota lists (~550 k a day, not a sample), counted by OpenDota's database every hour
 - ✅ Hosted in the bot: `/counterpick` `/pick` `/counters` `/hero`
-- ✅ Phantom Lancer check: 8 of our top 10 counters are in Dotabuff's top 14
+- ✅ Phantom Lancer vs Dotabuff with every game: win rates within 0.3 points, same top counters in nearly the same order (0.98) → [details](docs/VALIDATION.md)
 - 🔨 Filling the 90-day window: about a month per hour, all 90 days by the morning of 2026-11-02
 - ✅ Asilbek's website version: average win rate vs the enemies, rank and patch filters → [setup](docs/COUNTERPICK-WEB.md)
 - ✅ Asilbek's version also in the bot: `/asil` `/apick` (same data, his ranking rules)

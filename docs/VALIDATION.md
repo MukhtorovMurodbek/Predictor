@@ -28,18 +28,20 @@ All 25 commands were sent from a real Telegram account (Telegram Web) to @localH
 
 ## 2. Counter-picker vs Dotabuff
 
-Dotabuff's Phantom Lancer "counters" table (100k+ games per pair) vs our statistics after
-**one day** of data (91,617 public games):
+Dotabuff's Phantom Lancer "counters" table (100k+ games per pair) vs our statistics, first
+after one day of sampled games, then again once the bot counted every public game OpenDota
+lists (2026-11-01, 10.7 M games from Oct 13 to Nov 1, ~30,000 games per pair):
 
-| | |
-|---|---|
-| Dotabuff's top-10 counters, their rank in our list of 101 heroes | 1, 25, 5, 4, 3, 8, 6, 11, 14, 10 |
-| Win rate vs PL, ours vs Dotabuff (21 heroes) | correlation 0.75, average gap 1.6 points |
-| Ranking agreement (Spearman, 21 heroes) | 0.60 |
+| | one day, 91,617 sampled games | every game, 10.7 M |
+|---|---|---|
+| Dotabuff's top-10 counters, their rank in our list | 1, 25, 5, 4, 3, 8, 6, 11, 14, 10 | **2, 1, 4, 3, 6, 9, 5, 7, 8, 11** |
+| PL's win rate vs those 21 heroes, ours vs Dotabuff | correlation 0.75, average gap 1.6 points | **correlation 0.99, average gap 0.3 points** |
+| Ranking agreement (Spearman, 21 heroes) | 0.60 | **0.98** |
 
-Our top PL counters: Tidehunter, Centaur, Sand King, Axe, Underlord, Warlock, Timbersaw, CM:
-the same heroes Dotabuff lists. The one big miss (Leshrac, #25 for us) has only 212 games so
-far. Numbers will tighten as the hourly updates fill the 90-day window.
+Our top PL counters now: Leshrac, Tidehunter, Axe, Underlord, Warlock, Sand King, Dark Seer,
+Sven, Timbersaw, Io. That is Dotabuff's list, nearly in Dotabuff's order. The one-day miss
+(Leshrac, #25 with 212 games) was noise. The old hourly sample was also skewed: about half
+of it was Divine games, against 11% of all games.
 
 ## 3. Team ratings vs Dota2ProTips Elo
 
