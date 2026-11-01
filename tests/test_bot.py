@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 
 from predictor.bot import auth as auth_mod
-from predictor.bot.app import help_text
+from predictor.bot.app import all_commands, help_text, start_text
 from predictor.bot.auth import Auth
 from predictor.bot.config import load_config
 from predictor.bot.registry import MODELS
@@ -90,10 +90,15 @@ def test_auth_locks_username_to_first_id(tmp_path, monkeypatch):
 
 def test_help_text_and_command_names():
     assert_telegram_html(help_text())
+    assert_telegram_html(start_text("Tester <3"))
+    names = [name for name, _, _ in all_commands()]
+    assert len(names) == len(set(names))
+    for name, _, desc in all_commands():
+        assert re.fullmatch(r"[a-z0-9_]{1,32}", name)
+        assert 3 <= len(desc) <= 256
     for m in MODELS.values():
-        for name, _, desc in m.COMMANDS:
-            assert re.fullmatch(r"[a-z0-9_]{1,32}", name)
-            assert 3 <= len(desc) <= 256
+        assert m.NAME in names
+        assert_telegram_html(m.help_text())
 
 
 def test_pick(model):

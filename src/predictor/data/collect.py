@@ -1,7 +1,7 @@
 """Data collectors.
 
     python -m predictor.data.collect heroes
-    python -m predictor.data.collect pro --since 2025-01-01
+    python -m predictor.data.collect pro              (new matches only; --since 2023-01-01 to rebuild)
     python -m predictor.data.collect public --calls 500 --min-rank 70
 """
 
@@ -13,7 +13,10 @@ import numpy as np
 import pandas as pd
 
 from .. import DATA_DIR, RAW_DIR
-from . import D_COLS, HEROES_PATH, PATCHES_PATH, R_COLS, SOURCES, patch_for_times, to_unix
+from . import (
+    D_COLS, HEROES_PATH, LEAGUES_PATH, PATCHES_PATH, PLAYER_COLS, PLAYERS_PATH, R_COLS, SOURCES, TEAMS_PATH,
+    patch_for_times, to_unix,
+)
 from .opendota import OpenDota, QuotaExhausted
 
 # All Pick, Captains Mode, Random Draft, Single Draft, Captains Draft, Ranked All Pick.
@@ -22,16 +25,18 @@ NORMAL_GAME_MODES = {1, 2, 3, 4, 16, 22}
 MIN_DURATION = 600  # seconds; shorter games are mostly abandons
 
 PRO_SQL = """
-SELECT m.match_id, m.start_time, m.duration, m.radiant_win, m.leagueid,
-       m.radiant_team_id, m.dire_team_id, mp.patch, pm.player_slot, pm.hero_id
+SELECT m.match_id, m.start_time, m.duration, m.radiant_win, m.leagueid, l.tier,
+       m.radiant_team_id, m.dire_team_id, mp.patch, pm.player_slot, pm.hero_id, pm.account_id
 FROM matches m
 JOIN match_patch mp USING (match_id)
 JOIN player_matches pm USING (match_id)
+LEFT JOIN leagues l USING (leagueid)
 WHERE m.start_time >= {since} AND m.match_id < {cursor}
 ORDER BY m.match_id DESC
 LIMIT {limit}
 """
-PRO_META = ["start_time", "duration", "radiant_win", "leagueid", "radiant_team_id", "dire_team_id", "patch"]
+PRO_META = ["start_time", "duration", "radiant_win", "leagueid", "tier", "radiant_team_id", "dire_team_id", "patch"]
+DEFAULT_PRO_SINCE = "2023-01-01"  # older history warms up team and player ratings
 
 
 def save_matches(df: pd.DataFrame, path: Path) -> int:
@@ -57,17 +62,46 @@ def _pro_rows_to_wide(rows: list[dict]) -> pd.DataFrame:
     df = df[df["hero_id"] > 0].sort_values(["match_id", "player_slot"])
     side = np.where(df["player_slot"] < 128, "r", "d")
     df["col"] = side + df.groupby(["match_id", side]).cumcount().astype(str)
+    df["pcol"] = side + "p" + df.groupby(["match_id", side]).cumcount().astype(str)
+    df["account_id"] = df["account_id"].fillna(0)
     heroes = df.pivot(index="match_id", columns="col", values="hero_id")
     heroes = heroes.reindex(columns=R_COLS + D_COLS).dropna().astype("int16")
+    players = df.pivot(index="match_id", columns="pcol", values="account_id")
+    players = players.reindex(columns=PLAYER_COLS).fillna(0).astype("int64")
     meta = df.groupby("match_id")[PRO_META].first()
-    return heroes.join(meta, how="inner").reset_index()
+    return heroes.join(players, how="inner").join(meta, how="inner").reset_index()
 
 
-def collect_pro(api: OpenDota, since: str, page_rows: int = 50_000) -> None:
-    """Pull every pro match since a date via explorer SQL, newest first, in pages."""
-    cursor, total = 10**12, 0
+def collect_teams_and_leagues(api: OpenDota) -> None:
+    teams = pd.DataFrame(api.explorer("SELECT team_id, name, tag FROM teams"))
+    teams.to_parquet(TEAMS_PATH, index=False)
+    leagues = pd.DataFrame(api.explorer("SELECT leagueid, name, tier FROM leagues"))
+    leagues.to_parquet(LEAGUES_PATH, index=False)
+    players = pd.DataFrame(api.explorer("SELECT account_id, name FROM notable_players WHERE name IS NOT NULL"))
+    players.to_parquet(PLAYERS_PATH, index=False)
+    print(f"saved {len(teams)} teams, {len(leagues)} leagues, {len(players)} named players")
+
+
+def _pro_since(since: str | None) -> int:
+    """Explicit date, or continue from the newest saved match, or start from DEFAULT_PRO_SINCE."""
+    if since:
+        return to_unix(since)
+    path = SOURCES["pro"]
+    if path.exists():
+        old = pd.read_parquet(path)
+        if set(PLAYER_COLS) <= set(old.columns):
+            return int(old["start_time"].max()) - 3 * 86400
+        path.unlink()  # saved by an older version without player columns: rebuild it
+    return to_unix(DEFAULT_PRO_SINCE)
+
+
+def collect_pro(api: OpenDota, since: str | None = None, page_rows: int = 50_000) -> None:
+    """Pull pro matches via explorer SQL, newest first, in pages. Without `since` it only
+    fetches matches newer than the ones already saved."""
+    cursor, total, start = 10**12, 0, _pro_since(since)
+    print(f"fetching pro matches since {pd.to_datetime(start, unit='s'):%Y-%m-%d}")
     while True:
-        rows = api.explorer(PRO_SQL.format(since=to_unix(since), cursor=cursor, limit=page_rows))
+        rows = api.explorer(PRO_SQL.format(since=start, cursor=cursor, limit=page_rows))
         if not rows:
             break
         full_page = len(rows) == page_rows
@@ -82,6 +116,7 @@ def collect_pro(api: OpenDota, since: str, page_rows: int = 50_000) -> None:
         if not full_page:
             break
     print(f"pro matches saved: {total} -> {SOURCES['pro']}")
+    collect_teams_and_leagues(api)
 
 
 def _public_batch_to_rows(batch: list[dict]) -> list[dict]:
@@ -142,7 +177,7 @@ def main(argv=None):
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("heroes", help="hero list + patch dates")
     pro = sub.add_parser("pro", help="pro matches via explorer SQL")
-    pro.add_argument("--since", default="2025-01-01", help="YYYY-MM-DD")
+    pro.add_argument("--since", help="YYYY-MM-DD (default: continue from the newest saved match, or 2023-01-01)")
     pub = sub.add_parser("public", help="public ranked matches")
     pub.add_argument("--calls", type=int, default=500, help="API calls to spend (100 matches each)")
     pub.add_argument("--min-rank", type=int, default=70, help="rank tier, e.g. 70=Divine, 80=Immortal")

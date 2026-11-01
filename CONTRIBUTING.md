@@ -3,6 +3,8 @@
 We're in different cities and time zones, so the defaults are: **write things down, work
 async, keep `main` working.**
 
+Using an AI coding agent (Codex, Claude, ...)? Point it at [AGENTS.md](AGENTS.md) first.
+
 ## Flow
 
 1. Pick or create an **Issue**. Say what "done" looks like. Assign yourself.

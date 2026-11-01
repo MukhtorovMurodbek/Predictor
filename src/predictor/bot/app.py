@@ -18,33 +18,58 @@ from .registry import MODELS
 
 log = logging.getLogger("predictor.bot")
 STARTED = time.time()
-
-INTRO = """<b>Dota 2 Predictor</b> 🎯
-Hero names can be full or short: <code>Phantom Assassin</code>, <code>phantom a</code>, <code>pa</code>, <code>cm</code>.
-Separate heroes with commas."""
+BOT_NAME = "Dota 2 Lab"
 
 GENERAL_HELP = """<b>ℹ️ General</b>
+/start — pick a model
 /status — models, data and running jobs
-/help — this message"""
+/help — every command at once"""
+
+
+def start_text(first_name: str) -> str:
+    lines = [
+        f"Hi {html.escape(first_name)}! I'm <b>{BOT_NAME}</b> 🧪: our team's Dota 2 models in one bot.",
+        "",
+        "<b>Pick a model</b> to see what it does and how to use it:",
+    ]
+    lines += [f"/{m.NAME} — <b>{m.TITLE}</b>: {m.SUMMARY}" for m in MODELS.values()]
+    lines += [
+        "",
+        "/admin — collect data, retrain and test models",
+        "/status — what's loaded, how much data",
+        "/help — every command at once",
+    ]
+    return "\n".join(lines)
 
 
 def help_text() -> str:
-    sections = [INTRO, *(m.HELP for m in MODELS.values()), admin.HELP.format(models=", ".join(MODELS)), GENERAL_HELP]
+    sections = [*(m.help_text() for m in MODELS.values()), admin.HELP.format(models=", ".join(MODELS)), GENERAL_HELP]
     return "\n\n".join(sections)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    name = html.escape(update.effective_user.first_name or "")
-    await update.effective_message.reply_text(f"Hi {name}! Here's what I can do.\n\n{help_text()}")
+    await update.effective_message.reply_text(start_text(update.effective_user.first_name or ""))
 
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text(help_text())
 
 
+async def admin_help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await update.effective_message.reply_text(admin.HELP.format(models=", ".join(MODELS)))
+
+
+def intro_command(model):
+    async def intro(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+        await update.effective_message.reply_text(model.help_text())
+
+    intro.__name__ = f"intro_{model.NAME}"
+    return intro
+
+
 async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     hours, rest = divmod(int(time.time() - STARTED), 3600)
-    lines = [f"<b>Status</b> · up {hours} h {rest // 60} min", "", "<b>Models</b>"]
+    lines = [f"<b>{BOT_NAME} status</b> · up {hours} h {rest // 60} min", "", "<b>Models</b>"]
     lines += [f"• {m.status()}" for m in MODELS.values()]
     lines += ["", "<b>Data</b>"]
     for name, path in SOURCES.items():
@@ -55,17 +80,28 @@ async def status(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 async def unknown(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.effective_message.reply_text("I don't know that command. Send /help to see what I can do.")
+    await update.effective_message.reply_text("I don't know that command. Send /start to pick a model, or /help for everything.")
 
 
 async def plain_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    await update.effective_message.reply_text("Send /help to see what I can do.")
+    await update.effective_message.reply_text("Send /start to pick a model, or /help to see every command.")
 
 
 async def on_error(update: object, context: ContextTypes.DEFAULT_TYPE) -> None:
     log.error("error while handling an update", exc_info=context.error)
     if isinstance(update, Update) and update.effective_message:
         await update.effective_message.reply_text(f"Something went wrong: <code>{html.escape(repr(context.error))}</code>")
+
+
+def all_commands() -> list[tuple[str, object, str]]:
+    """(command, handler, menu description) in the order shown in Telegram's / menu."""
+    commands = [("start", start, "Pick a model")]
+    for m in MODELS.values():
+        commands.append((m.NAME, intro_command(m), f"{m.TITLE}: how to use it"))
+        commands += m.COMMANDS
+    commands += [("admin", admin_help, "Admin: collect data, retrain, test"), *admin.COMMANDS]
+    commands += [("status", status, "Models, data and running jobs"), ("help", help_cmd, "Every command at once")]
+    return commands
 
 
 def build_app(config: BotConfig) -> Application:
@@ -84,16 +120,11 @@ def build_app(config: BotConfig) -> Application:
 
         return handler
 
-    commands = [
-        ("start", start, "Welcome and instructions"),
-        ("help", help_cmd, "All commands with examples"),
-        ("status", status, "Models, data and running jobs"),
-        *(cmd for m in MODELS.values() for cmd in m.COMMANDS),
-        *admin.COMMANDS,
-    ]
+    commands = all_commands()
 
     async def post_init(app: Application) -> None:
         await app.bot.set_my_commands([BotCommand(name, desc) for name, _, desc in commands])
+        await app.bot.set_my_short_description(f"{BOT_NAME}: Dota 2 counter-picks and pro match predictions")
         me = await app.bot.get_me()
         if config.username and me.username.lower() != config.username.lower():
             log.warning("bot_username in .env is %s but the token belongs to @%s", config.username, me.username)

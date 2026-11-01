@@ -9,14 +9,16 @@ finally one **universal model** that does everything.
 
 - **[docs/PLAN.md](docs/PLAN.md)**: roadmap, what's done, what's next
 - **[docs/BOT.md](docs/BOT.md)**: using and hosting the Telegram bot
+- **[PROGRESS.md](PROGRESS.md)**: short checklist of what's done
 - **[CONTRIBUTING.md](CONTRIBUTING.md)**: how we work together, how to add a model
+- **[AGENTS.md](AGENTS.md)**: rules for AI coding agents (Codex, Claude, ...)
 
 ## Models
 
 | # | Model | Trained on | Status | Bot commands |
 |---|---|---|---|---|
-| 1 | Counter-picker | public ranked games | ✅ live in the bot | `/pick` `/counters` `/hero` |
-| 2 | Draft win predictor | pro matches only | ⬜ next | — |
+| 1 | Counter-picker | public ranked games | ✅ live in the bot | `/counterpick` `/pick` `/counters` `/hero` |
+| 2 | Pro match predictor | pro matches only | ✅ live in the bot | `/pro` `/predict` `/team` `/top` |
 | 3 | Pro next-pick predictor | pro drafts | ⬜ | — |
 | 4 | Live in-game predictor | pro match timelines | ⬜ | — |
 | 5 | Tournament (TI) predictor | pro results | ⬜ | — |
@@ -50,7 +52,7 @@ The same things the bot does, from a terminal:
 ```bash
 # data (OpenDota free tier: 60 calls/min, 3,000/day per internet connection)
 python -m predictor.data.collect heroes
-python -m predictor.data.collect pro --since 2025-01-01
+python -m predictor.data.collect pro                 # since 2023 the first time, then only new matches
 python -m predictor.data.collect public --calls 500 --min-rank 70
 
 # model 1: counter-picker
@@ -58,6 +60,10 @@ python -m predictor.counterpick.train
 python -m predictor.counterpick.evaluate
 python -m predictor.counterpick.recommend --enemies "pa, pudge, lion" --allies "cm"
 python -m predictor.counterpick.recommend --counters "Phantom Assassin"
+
+# model 2: pro match predictor
+python -m predictor.pro.train                        # ~2 min, prints its accuracy report
+python -m predictor.pro.evaluate
 
 # the bot (host only, see docs/BOT.md)
 python -m predictor.bot
@@ -70,7 +76,8 @@ src/predictor/
   data/            shared: OpenDota client, collectors, loading matches, hero names
   counterpick/     model 1: model.py, train.py, evaluate.py, recommend.py (CLI), bot.py (bot commands)
   bot/             Telegram bot: app.py, auth.py (allowed users), admin.py (/collect /train), registry.py (hosted models)
-  draft/ ...       next models follow the same pattern
+  pro/             model 2: features.py (ratings, form, draft), model.py, train.py, evaluate.py, bot.py
+  ...              next models follow the same pattern
 tests/             pytest tests, run automatically on GitHub for every push
 scripts/           run_bot.bat: double-click to start the bot on Windows
 docs/              plan and bot guide

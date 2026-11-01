@@ -22,8 +22,9 @@ log = logging.getLogger(__name__)
 MAX_PUBLIC_CALLS = 2900  # OpenDota free tier: 3000 calls/day
 
 HELP = """<b>⚙️ Admin</b> (everyone on the list can use these)
+<b>Daily refresh:</b> /collect pro → /train pro, and /collect public 2500 → /train counterpick
 /collect public <i>[calls]</i> — download public games, ~87 per call, 1 call/sec (default 300 ≈ 5 min)
-/collect pro — download new pro matches
+/collect pro — download new pro matches (+ teams, leagues)
 /collect heroes — refresh hero list and patches
 /train <i>[model]</i> — retrain a model on the current data
 /evaluate <i>[model]</i> — test a model on the newest games
@@ -72,8 +73,8 @@ async def collect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if what == "heroes":
         await _run_job(update, "collect heroes", collect_heroes, OpenDota())
     elif what == "pro":
-        since = args[1] if len(args) > 1 else "2025-01-01"
-        await _run_job(update, f"collect pro since {since}", collect_pro, OpenDota(), since)
+        since = args[1] if len(args) > 1 else None
+        await _run_job(update, f"collect pro{' since ' + since if since else ''}", collect_pro, OpenDota(), since)
     elif what == "public":
         try:
             calls = min(int(args[1]) if len(args) > 1 else 300, MAX_PUBLIC_CALLS)
@@ -88,20 +89,19 @@ async def collect(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
 
 
 def _pick_model(context: ContextTypes.DEFAULT_TYPE):
-    name = (context.args[0].lower() if context.args else "counterpick")
-    return MODELS.get(name)
+    return MODELS.get(context.args[0].lower()) if context.args else None
 
 
 async def train(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not (model := _pick_model(context)):
-        await update.effective_message.reply_text(f"Unknown model. Models: {', '.join(MODELS)}")
+        await update.effective_message.reply_text(f"Which model? " + " or ".join(f"<code>/train {m}</code>" for m in MODELS))
         return
     await _run_job(update, f"train {model.NAME}", model.train_model)
 
 
 async def evaluate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     if not (model := _pick_model(context)):
-        await update.effective_message.reply_text(f"Unknown model. Models: {', '.join(MODELS)}")
+        await update.effective_message.reply_text(f"Which model? " + " or ".join(f"<code>/evaluate {m}</code>" for m in MODELS))
         return
     await _run_job(update, f"evaluate {model.NAME}", model.evaluate_model)
 

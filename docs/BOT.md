@@ -21,19 +21,26 @@ in Telegram's `/` menu.
 
 | Command | What it does |
 |---|---|
+| `/start` | Pick a model. `/counterpick`, `/pro` and `/admin` each explain their own commands |
 | `/pick pa, pudge, lion` | Best heroes to pick against those enemies |
 | `/pick pa, pudge \| cm, axe \| invoker` | Same, plus your team (after the 1st `\|`) and bans (after the 2nd) |
 | `/counters phantom assassin` | Heroes that beat this hero |
 | `/hero cm` | A hero's win rate, best and worst matchups, best allies |
+| `/predict spirit vs liquid` | Pro match: chance to win a map, Bo3 and Bo5 |
+| `/predict spirit: pa, cm, axe, lion, invoker vs liquid: am, lina, tide, rubick, sven` | The same after the draft |
+| `/team falcons` | Pro team rating, recent maps, roster, favourite heroes |
+| `/top` | Strongest active pro teams |
 | `/status` | Which models are loaded, how much data, running jobs |
 | `/collect public 300` | Admin: download ~26 k public games (300 API calls ≈ 5 min) |
-| `/collect pro` | Admin: download new pro matches |
+| `/collect pro` | Admin: download new pro matches (+ team, league and player names) |
 | `/train counterpick` | Admin: retrain the counter-picker on all collected data |
+| `/train pro` | Admin: retrain the pro predictor (~2 min) |
 | `/evaluate counterpick` | Admin: accuracy on the newest games vs simple baselines |
 
 Hero names can be full (`Phantom Assassin`), partial (`phantom a`) or initials (`pa`).
 
-**A good daily routine:** `/collect public 2500` (about 45 min), then `/train counterpick`.
+**A good daily routine:** `/collect pro` then `/train pro` (a few minutes), and
+`/collect public 2500` (about 45 min) then `/train counterpick`.
 The model reloads by itself after training, so there's no need to restart the bot.
 
 ## Who can use it
@@ -76,6 +83,8 @@ Get some data and a model, either from the command line or later through the bot
 .venv\Scripts\python -m predictor.data.collect heroes
 .venv\Scripts\python -m predictor.data.collect public --calls 300
 .venv\Scripts\python -m predictor.counterpick.train
+.venv\Scripts\python -m predictor.data.collect pro
+.venv\Scripts\python -m predictor.pro.train
 ```
 
 ### 2. Start it

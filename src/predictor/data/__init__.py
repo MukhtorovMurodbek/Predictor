@@ -14,8 +14,12 @@ from .. import DATA_DIR, RAW_DIR
 
 R_COLS = [f"r{i}" for i in range(5)]
 D_COLS = [f"d{i}" for i in range(5)]
+PLAYER_COLS = [f"rp{i}" for i in range(5)] + [f"dp{i}" for i in range(5)]  # account ids, same order as heroes
 HEROES_PATH = DATA_DIR / "heroes.json"
 PATCHES_PATH = DATA_DIR / "patches.json"
+TEAMS_PATH = DATA_DIR / "teams.parquet"
+LEAGUES_PATH = DATA_DIR / "leagues.parquet"
+PLAYERS_PATH = DATA_DIR / "players.parquet"
 SOURCES = {"pro": RAW_DIR / "pro_matches.parquet", "public": RAW_DIR / "public_matches.parquet"}
 
 

@@ -14,6 +14,7 @@ from .train import train
 
 NAME = "counterpick"
 TITLE = "Counter-picker"
+SUMMARY = "best heroes to pick in your own (non-pro) games"
 SOURCE = "public"  # counter-picks are for regular ranked games, not pro play
 PCT = 25  # log-odds -> percentage points of win chance, near 50%
 
@@ -25,7 +26,12 @@ HELP = """<b>🛡 Counter-picker</b> (learned from public ranked games)
    <code>/counters phantom assassin</code>
 /hero <i>hero</i> — win rate, best and worst matchups, best allies
    <code>/hero cm</code>
+Hero names can be full or short: <code>Phantom Assassin</code>, <code>phantom a</code>, <code>pa</code>, <code>cm</code>.
 Percentages are the rough change in your team's win chance."""
+
+
+def help_text() -> str:
+    return HELP
 
 _cache: dict = {"mtime": None, "model": None}
 

@@ -133,12 +133,35 @@ Known issues / next steps:
 - Grow public data to 200 k+ matches (all three of us collecting daily) and re-run `evaluate`.
 - Role awareness: right now it can suggest a 4th carry.
 
-### Phase 2 — Pro draft win predictor ⬅ next
+### Phase 2 — Pro match predictor ✅ hosted
 - **Pro matches only.** Inputs: both drafts, both teams' recent form/rating, patch.
   Players and teams matter more than heroes in pro play, so team strength is a key feature.
 - Logistic regression → **LightGBM** → small neural model (hero + team embeddings) on the 3050 Ti
 - Weight recent patches more. Metrics: log loss, Brier, calibration. Accuracy alone is misleading.
-- **Host:** `/predict <radiant heroes> vs <dire heroes>` (+ optional team names) in the bot
+- [x] Data: 106,900 pro matches since 2023 with players, team ids, league tiers; team, league, player names
+- [x] Chronological features (`pro/features.py`): team Elo, player Elo, experience, form,
+      head-to-head; after the draft also hero meta, players' and team's hero comfort, pro counters
+- [x] Two gradient-boosting models: before the draft and after the draft. Sides are
+      averaged, so you don't need to know who's Radiant
+- [x] Hosted: `/predict`, `/team`, `/top`, `/pro`, plus admin `/train pro`
+
+**Results (2026-11-01).** Trained on matches before 2025-11-25, tested on 18,235 newer ones.
+
+| Test set | Model | Accuracy | Log loss |
+|---|---|---|---|
+| all tiers | always Radiant | 52.3% | 0.6922 |
+| | team Elo only | 56.4% | 0.6776 |
+| | before draft | 60.3% | 0.6449 |
+| | after draft | **61.0%** | **0.6415** |
+| tier 1–2 (professional + premium, 6,879 matches) | before draft | 65.6% | 0.6160 |
+| | after draft | **65.7%** | **0.6116** |
+
+Calibrated: when it says 60–70% it's right 67% of the time, at 70–80% it's 77%, and at
+80%+ it's 90% (that last group is 6% of matches).
+
+Next ideas: tune the Elo settings, add patch-specific hero meta, model best-of series directly,
+and handle roster changes better (stand-ins). Most of the gain is in team/player strength,
+not heroes. That's expected in pro play.
 
 ### Phase 3 — Pro draft assistant (week 3–4)
 - Data: pro `picks_bans` **with order** (explorer `picks_bans` table)
