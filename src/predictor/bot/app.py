@@ -44,8 +44,17 @@ def start_text(first_name: str) -> str:
 
 
 def help_text() -> str:
-    sections = [*(m.help_text() for m in MODELS.values()), admin.HELP.format(models=", ".join(MODELS)), GENERAL_HELP]
-    return "\n\n".join(sections)
+    """Every command on one line each. The full examples live in each model's /NAME intro,
+    so this stays under Telegram's 4,096-character message limit."""
+    lines = [f"<b>{BOT_NAME}: all commands</b>", "Send a model's command (e.g. /pro) for examples.", ""]
+    for m in MODELS.values():
+        lines.append(f"<b>{m.TITLE}</b> · /{m.NAME}")
+        lines += [f"/{name} — {html.escape(desc)}" for name, _, desc in m.COMMANDS]
+        lines.append("")
+    lines.append("<b>Admin</b> · /admin")
+    lines += [f"/{name} — {html.escape(desc)}" for name, _, desc in admin.COMMANDS]
+    lines += ["", GENERAL_HELP]
+    return "\n".join(lines)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

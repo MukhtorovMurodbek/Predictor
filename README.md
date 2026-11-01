@@ -21,7 +21,7 @@ finally one **universal model** that does everything.
 | 2 | Pro match predictor | pro matches only | ✅ live in the bot | `/pro` `/predict` `/team` `/top` |
 | 3 | Pro draft predictor (next pick/ban) | pro drafts only | ✅ live in the bot | `/draft` `/next` |
 | 4 | Live in-game predictor | pro match timelines | ✅ live in the bot | `/livepro` `/live` `/ingame` |
-| 5 | Tournament (TI) predictor | pro results | ⬜ | — |
+| 5 | Tournament (TI) predictor | pro model + simulated TI format | ✅ live in the bot | `/tournament` `/odds` |
 | 6 | Universal model | everything | ⬜ last | — |
 
 Each model is built, then hosted in the bot, before the next one starts.
@@ -70,6 +70,9 @@ python -m predictor.draft.train                      # ~4 min, prints its top-5 
 # model 4: live in-game predictor
 python -m predictor.live.train                       # ~3 min
 
+# model 5: tournament predictor (uses the pro model)
+python -m predictor.tournament.backtest             # test on TI 2023-2026, ~5 min
+
 # the bot (host only, see docs/BOT.md)
 python -m predictor.bot
 ```
@@ -84,6 +87,7 @@ src/predictor/
   pro/             model 2: features.py (ratings, form, draft), model.py, train.py, evaluate.py, bot.py
   draft/           model 3: features.py (draft habits), model.py, train.py, bot.py
   live/            model 4: features.py (scoreboard), model.py, train.py, bot.py (/live, /ingame)
+  tournament/      model 5: sim.py (Swiss + double elimination Monte Carlo), backtest.py, bot.py
   ...              next models follow the same pattern
 tests/             pytest tests, run automatically on GitHub for every push
 scripts/           run_bot.bat: double-click to start the bot on Windows

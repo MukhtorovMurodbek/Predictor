@@ -233,7 +233,28 @@ Next ideas: kill score (in the live feed but needs kill timelines for training),
 live feed's building state, a live line chart, first blood / first Roshan / first tower models,
 and Dota's Game State Integration while spectating for a faster, richer feed.
 
-### Phase 5 — Tournament predictor (before the next TI)
+### Phase 5 — Tournament predictor ✅ hosted
+- [x] Monte Carlo of a TI-style event (`tournament/sim.py`): Swiss stage (Bo3, 3 wins through,
+      3 losses out) → 8-team double elimination, grand final Bo5. Map chances from the pro
+      match predictor, 10,000 simulations per question
+- [x] Backtest (`tournament/backtest.py`): for each TI in the data, rebuild the pro model from
+      matches before the event, simulate it with the real teams, compare with the real winner
+- [x] Hosted: `/tournament` (intro + backtest) and `/odds` (top-16 teams today, or your list)
+
+**Backtest (2026-11-01):**
+
+| TI | real champion | our chance for them | rank | our favourite | random guess |
+|---|---|---|---|---|---|
+| 2023 | Team Spirit | **36%** | #1 of 20 | Team Spirit | 5% |
+| 2024 | Team Liquid | **12%** | #3 of 16 | Team Falcons 24% | 6% |
+| 2025 | Team Falcons | **29%** | #1 of 16 | Team Falcons | 6% |
+| 2026 | Team Spirit | 6% | #7 of 16 | TEAM VISION 28% | 6% |
+
+On average (geometric mean) the champions got ~16% vs ~6% for a random guess.
+Next ideas: the exact format of each year, seeding from group results, betting odds as a
+comparison, roster changes right before the event.
+
+### Phase 5 — original notes
 - **Team ratings**: Elo / Glicko-2 from pro results, with roster changes and decay
 - Match model: team rating diff (+ draft model during the series)
 - **Monte Carlo the TI format** (groups + double elimination playoffs), 100 k runs →

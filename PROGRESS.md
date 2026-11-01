@@ -44,8 +44,10 @@ _Last updated: 2026-11-01_
 - ✅ Tested: right 62% at the start, 69% at 10 min, 77% at 20 min, 82% at 30 min
 - ✅ Hosted in the bot: `/livepro` `/live` `/ingame`
 
-## 5. Tournament (TI) predictor
-- ⬜ Next
+## 5. Tournament (TI) predictor 👤 Murodbek + Claude
+- ✅ Simulates a TI-style event 10,000 times with the pro model's map chances
+- ✅ Backtested on TI 2023–2026: winner ranked #1 twice, #3 once, #7 once (avg ~16% vs 6% random)
+- ✅ Hosted in the bot: `/tournament` `/odds`
 
 ## 6. Universal model
-- ⬜ Not started (last)
+- ⬜ Next (last)

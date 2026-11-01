@@ -21,7 +21,7 @@ in Telegram's `/` menu.
 
 | Command | What it does |
 |---|---|
-| `/start` | Pick a model. `/counterpick`, `/pro`, `/draft`, `/livepro` and `/admin` each explain their own commands |
+| `/start` | Pick a model. `/counterpick`, `/pro`, `/draft`, `/livepro`, `/tournament` and `/admin` each explain their own commands. `/help` lists every command |
 | `/pick pa, pudge, lion` | Best heroes to pick against those enemies |
 | `/pick pa, pudge \| cm, axe \| invoker` | Same, plus your team (after the 1st `\|`) and bans (after the 2nd) |
 | `/counters phantom assassin` | Heroes that beat this hero |
@@ -31,6 +31,8 @@ in Telegram's `/` menu.
 | `/team falcons` | Pro team rating, recent maps, roster, favourite heroes |
 | `/top` | Strongest active pro teams |
 | `/next spirit vs liquid: axe, pudge, lion` | Pro draft: most likely next pick/ban. First team = the one that acts first; heroes = everything picked/banned so far, in order |
+| `/odds` | Title chances if the 16 strongest active teams played a TI today |
+| `/odds spirit, falcons, liquid, ...` | Title chances for 8+ teams you list |
 | `/status` | Which models are loaded, how much data, running jobs |
 | `/collect public 300` | Admin: download ~26 k public games (300 API calls ≈ 5 min) |
 | `/collect pro` | Admin: download new pro matches (+ team, league and player names) |
@@ -38,6 +40,7 @@ in Telegram's `/` menu.
 | `/ingame spirit vs liquid 25 +5k towers 3-1` | Live win % from a scoreboard you type |
 | `/train counterpick` | Admin: update the counter-picker statistics now (it also does this every hour by itself) |
 | `/train livepro` | Admin: retrain the live predictor (~3 min) |
+| `/train tournament` | Admin: re-run the TI backtest (~5 min); `/odds` itself always uses the latest pro model |
 | `/train pro` | Admin: retrain the pro predictor (~2 min) |
 | `/train draft` | Admin: retrain the draft predictor (~4 min) |
 | `/evaluate counterpick` | Admin: how many games back the statistics |

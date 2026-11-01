@@ -13,7 +13,8 @@ Dota 2 models for a small team of students, served through one private Telegram 
 | 2. Pro match predictor | `src/predictor/pro/` | **pro matches only** | Murodbek (+ Claude) |
 | 3. Pro draft predictor (next pick/ban) | `src/predictor/draft/` | **pro drafts only** | Murodbek (+ Claude) |
 | 4. Live in-game predictor | `src/predictor/live/` | **pro** match timelines | Murodbek (+ Claude) |
-| 5–6. Tournament, universal | not started | pro | see `docs/PLAN.md` |
+| 5. Tournament (TI) predictor | `src/predictor/tournament/` | pro model + simulation | Murodbek (+ Claude) |
+| 6. Universal model | not started | everything | see `docs/PLAN.md` |
 
 Status lives in `PROGRESS.md`. The plan lives in `docs/PLAN.md`.
 
@@ -62,6 +63,7 @@ src/predictor/
                    train.py, evaluate.py, bot.py
   draft/           model 3: features.py (DraftState), model.py (DraftModel, replay), train.py, bot.py
   live/            model 4: features.py (scoreboard), model.py (LiveModel), train.py, bot.py
+  tournament/      model 5: sim.py (Monte Carlo of a TI-style event), backtest.py, bot.py
   bot/             Telegram bot: app.py, auth.py, admin.py (/collect /train /evaluate),
                    registry.py (the list of hosted models), config.py (.env)
 tests/             pytest
