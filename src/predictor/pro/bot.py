@@ -1,8 +1,10 @@
 """Telegram commands for the pro match predictor (see predictor/bot/registry.py)."""
 
+import asyncio
 import html
+import logging
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from telegram import Update
 from telegram.ext import ContextTypes
@@ -11,10 +13,14 @@ from ..data import resolve_heroes
 from .evaluate import evaluate
 from .model import MODEL_PATH, ProModel, series_win
 from .train import train
+from ..refresh import journal_summary, refresh
 
 NAME = "pro"
 TITLE = "Pro match predictor"
 SUMMARY = "who wins a pro match, before or after the draft"
+
+REFRESH_HOUR = 5  # local time of the nightly refresh (new matches, journal, retraining)
+log = logging.getLogger(__name__)
 
 _cache: dict = {"mtime": None, "model": None}
 
@@ -155,6 +161,11 @@ async def team(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     lines += [
         "",
         f"<b>Roster</b> (latest match): {html.escape(', '.join(model.player_name(p) for p in roster))}",
+        *(
+            [f"<i>Left since: {html.escape(', '.join(f'{model.player_name(p)} (now {model.team_name(t)})' for p, t in gone))}</i>"]
+            if (gone := model.departed(t))
+            else []
+        ),
         "<b>Most played heroes</b> (recent): "
         + html.escape(", ".join(model.hero_names[h] for h, g in model.signature_heroes(t) if g >= 0.5) or "—"),
     ]
@@ -170,10 +181,20 @@ async def top(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text("\n".join(lines))
 
 
+async def journal(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    text = await asyncio.to_thread(journal_summary)
+    await update.effective_message.reply_text(
+        "<b>Prediction journal</b> <i>(new pro maps, predicted before the models saw them)</i>\n"
+        f"{html.escape(text)}\n\n"
+        f"<i>Filled every night at {REFRESH_HOUR:02d}:00 when new pro matches are downloaded.</i>"
+    )
+
+
 COMMANDS = [
     ("predict", predict, "Who wins a pro match (map, Bo3, Bo5)"),
     ("team", team, "A pro team's rating, results and roster"),
     ("top", top, "Strongest active pro teams"),
+    ("journal", journal, "How predictions did on new pro matches"),
 ]
 
 
@@ -192,3 +213,17 @@ def train_model() -> str:
 
 def evaluate_model() -> str:
     return evaluate()
+
+
+async def background() -> None:
+    """Every night: new pro matches -> journal -> retrain the pro, draft and live models."""
+    while True:
+        now = datetime.now()
+        nxt = now.replace(hour=REFRESH_HOUR, minute=0, second=0, microsecond=0)
+        if nxt <= now:
+            nxt += timedelta(days=1)
+        await asyncio.sleep((nxt - now).total_seconds())
+        try:
+            log.info(await asyncio.to_thread(refresh, log=lambda *a: None))
+        except Exception:
+            log.exception("nightly refresh failed")

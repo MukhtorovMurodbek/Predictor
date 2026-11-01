@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 
 from .. import DATA_DIR
+from ..io import atomic_write
 from ..data import hero_arrays
 
 DAILY_DIR = DATA_DIR / "counterpick"
@@ -85,9 +86,9 @@ class Counts:
         )
 
     def save(self, path: Path) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        np.savez_compressed(path, **{k: getattr(self, k) for k in ("games", "wins", "vs_games", "vs_wins", "with_games", "with_wins")},
-                            n_matches=self.n_matches)
+        arrays = {k: getattr(self, k) for k in ("games", "wins", "vs_games", "vs_wins", "with_games", "with_wins")}
+        with atomic_write(path) as tmp, open(tmp, "wb") as fh:  # a file handle: numpy won't add ".npz"
+            np.savez_compressed(fh, **arrays, n_matches=self.n_matches)
 
     @classmethod
     def load(cls, path: Path) -> "Counts":

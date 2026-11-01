@@ -100,3 +100,15 @@ def test_bot_commands(model, monkeypatch):
     assert "Team Alpha" in run(pro_bot.team, "alpha")[0]
     assert "1. <b>Team Alpha</b>" in run(pro_bot.top, "")[0]
     assert_telegram_html(pro_bot.help_text())
+
+
+def test_roster_drops_transferred_players(model):
+    import copy
+
+    m = copy.deepcopy(model)
+    when, players = m.state.team_roster[1]
+    mover = players[0]
+    m.state.player_team[mover] = (when + 3600, 2)  # plays for Beta after Alpha's last match
+    assert mover not in m.roster(1) and len(m.roster(1)) == 4
+    assert m.departed(1) == [(mover, 2)]
+    assert m.roster(2) == m.state.team_roster[2][1]

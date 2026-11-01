@@ -20,6 +20,7 @@ from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.metrics import accuracy_score, log_loss
 
 from .. import MODELS_DIR
+from ..io import atomic_write
 from ..pro.features import DRAFT_FEATURES, PREGAME_FEATURES
 from .features import STATE_FEATURES, mask_optional, series_from_timeline
 
@@ -91,8 +92,7 @@ class LiveModel:
         return float(self.clf.predict_proba(pd.DataFrame([row], columns=FEATURES))[0, 1])
 
     def save(self, path: Path = MODEL_PATH) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "wb") as fh:
+        with atomic_write(path) as tmp, open(tmp, "wb") as fh:
             pickle.dump(self, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
     @staticmethod

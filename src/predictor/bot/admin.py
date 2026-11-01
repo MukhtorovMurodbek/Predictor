@@ -16,13 +16,17 @@ from telegram.ext import ContextTypes
 
 from ..data.collect import collect_heroes, collect_pro, collect_public
 from ..data.opendota import OpenDota
+from ..refresh import refresh
+from ..validate.event import replay_event
 from .registry import MODELS
 
 log = logging.getLogger(__name__)
 MAX_PUBLIC_CALLS = 2900  # OpenDota free tier: 3000 calls/day
 
 HELP = """<b>⚙️ Admin</b> (everyone on the list can use these)
-<b>Daily refresh:</b> /collect pro → /train pro → /train draft → /train livepro. The counter-picker updates itself every hour.
+<b>Automatic:</b> pro models refresh every night at 05:00 (new matches → /journal → retrain), the counter-picker every hour.
+/refresh — do the nightly pro refresh now (~10 min)
+/replay <i>event</i> — how the bot would have done at a past event (~4 min)
 /collect public <i>[calls]</i> — download public games, ~87 per call, 1 call/sec (default 300 ≈ 5 min)
 /collect pro — download new pro matches, drafts, timelines (+ teams, leagues)
 /collect heroes — refresh hero list and patches
@@ -106,8 +110,25 @@ async def evaluate(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await _run_job(update, f"evaluate {model.NAME}", model.evaluate_model)
 
 
+async def refresh_now(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    await _run_job(update, "refresh pro models (~10 min)", refresh)
+
+
+async def replay(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    name = " ".join(context.args).strip()
+    if not name:
+        await update.effective_message.reply_text(
+            "Which event? e.g. <code>/replay BLAST SLAM VIII</code> or <code>/replay The International 2025</code>\n"
+            "Rebuilds every model from matches before that event and checks it against what really happened (~4 min)."
+        )
+        return
+    await _run_job(update, f"replay {name}", lambda: replay_event(name, log=lambda *a: None))
+
+
 COMMANDS = [
     ("collect", collect, "Admin: download match data"),
+    ("refresh", refresh_now, "Admin: new pro matches + journal + retrain now"),
+    ("replay", replay, "Admin: how the bot would have done at a past event"),
     ("train", train, "Admin: retrain a model"),
     ("evaluate", evaluate, "Admin: test a model's accuracy"),
 ]

@@ -11,10 +11,17 @@ from .features import DRAFT_FEATURES, ProState
 R_PLAYERS, D_PLAYERS = PLAYER_COLS[:5], PLAYER_COLS[5:]
 
 
-def load_pro_matches() -> pd.DataFrame:
+# OpenDota's league tiers. "excluded" leagues (mostly amateur/showmatch events) inflated the
+# ratings of teams that farm them: dropping them improved tier-1/2 accuracy (65.4% -> 65.9%).
+PRO_TIERS = ("premium", "professional")
+
+
+def load_pro_matches(tiers=PRO_TIERS) -> pd.DataFrame:
     df = pd.read_parquet(SOURCES["pro"])
     if not set(PLAYER_COLS) <= set(df.columns):
         raise FileNotFoundError("pro data has no player columns, run: python -m predictor.data.collect pro --since 2023-01-01")
+    if tiers and "tier" in df.columns:
+        df = df[df["tier"].isin(tiers)]
     df = df[df["radiant_win"].notna()].sort_values(["start_time", "match_id"], ignore_index=True)
     df["radiant_win"] = df["radiant_win"].astype(bool)
     return df

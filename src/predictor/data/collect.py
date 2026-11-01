@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from .. import DATA_DIR, RAW_DIR
+from ..io import atomic_write
 from . import (
     D_COLS, DRAFTS_PATH, HEROES_PATH, TIMELINES_PATH, LEAGUES_PATH, PATCHES_PATH, PLAYER_COLS, PLAYERS_PATH, R_COLS, SOURCES, TEAMS_PATH,
     patch_for_times, to_unix,
@@ -54,7 +55,8 @@ def save_matches(df: pd.DataFrame, path: Path) -> int:
     if path.exists():
         df = pd.concat([pd.read_parquet(path), df], ignore_index=True)
     df = df.drop_duplicates("match_id", keep="last").sort_values("match_id", ignore_index=True)
-    df.to_parquet(path, index=False)
+    with atomic_write(path) as tmp:
+        df.to_parquet(tmp, index=False)
     return len(df)
 
 
@@ -190,7 +192,8 @@ def collect_drafts(api: OpenDota, since: str | None = None) -> None:
         if path.exists():
             df = pd.concat([pd.read_parquet(path), df], ignore_index=True)
         df = df.drop_duplicates(["match_id", "ord"], keep="last").sort_values(["match_id", "ord"], ignore_index=True)
-        df.to_parquet(path, index=False)
+        with atomic_write(path) as tmp:
+            df.to_parquet(tmp, index=False)
         total = df["match_id"].nunique()
         print(f"  drafts file has {total} matches")
     print(f"pro drafts saved: {total} matches -> {path}")

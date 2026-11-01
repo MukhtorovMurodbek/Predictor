@@ -3,13 +3,21 @@
 Quick status. Details are in [docs/PLAN.md](docs/PLAN.md).
 ✅ done · 🔨 in progress · ⬜ not started · 👤 owner
 
-_Last updated: 2026-11-01_
+_Last updated: 2026-11-01 (evening)_
 
 ## Setup
 - ✅ Public GitHub repo, MIT license, automatic tests on every push
 - ✅ Plan, setup guide, team workflow docs, [AGENTS.md](AGENTS.md) for Codex and other AIs
 - ✅ Telegram bot "Dota 2 Lab" on Murodbek's laptop, private to our 4 usernames, `/start`
   menu with one intro command per model → [docs/BOT.md](docs/BOT.md)
+
+## Real-world testing → [docs/VALIDATION.md](docs/VALIDATION.md)
+- ✅ All 25 bot commands tested from a real Telegram account
+- ✅ Counter-picker vs Dotabuff: same top counters for Phantom Lancer after 1 day of data
+- ✅ Team ratings vs Dota2ProTips Elo: same top 6, correlation 0.87
+- ✅ Replayed 2 real events with models frozen before them (BLAST SLAM VIII: 72% of maps, champion was our #1 pick)
+- ✅ Fixes from testing: transfers/rosters, league-tier filter (+0.5% accuracy), /help length, safe file saves
+- ✅ Nightly auto-refresh at 05:00 + prediction journal (`/journal`), `/replay <event>`
 
 ## 1. Counter-picker (public games) 👤 Asilbek (Codex + website)
 - ✅ Now plain statistics, no model: win rates per hero pair, last 90 days, like Dotabuff

@@ -17,6 +17,7 @@ import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 from .. import MODELS_DIR
+from ..io import atomic_write
 from ..data.teams import find_team
 from .features import DRAFT_FEATURES, PREGAME_FEATURES, ProState
 
@@ -69,7 +70,18 @@ class ProModel:
         return find_team(query, self.team_names, activity)
 
     def roster(self, team_id: int) -> tuple[int, ...]:
-        return self.state.team_roster[team_id][1]
+        """Players of the team's latest match, minus anyone who has played for another team
+        since then (a transfer). If everyone left, the old roster is kept."""
+        when, players = self.state.team_roster[team_id]
+        moved = getattr(self.state, "player_team", {})  # older model files don't have it
+        current = tuple(p for p in players if not (p in moved and moved[p][1] != team_id and moved[p][0] > when))
+        return current or players
+
+    def departed(self, team_id: int) -> list[tuple[int, int]]:
+        """[(player, new team)] for players who left `team_id` since its latest match."""
+        when, players = self.state.team_roster[team_id]
+        moved = getattr(self.state, "player_team", {})
+        return [(p, moved[p][1]) for p in players if p in moved and moved[p][1] != team_id and moved[p][0] > when]
 
     # ---- prediction ----------------------------------------------------------------------
 
@@ -110,8 +122,7 @@ class ProModel:
     # ---- persistence ---------------------------------------------------------------------
 
     def save(self, path: Path = MODEL_PATH) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "wb") as fh:
+        with atomic_write(path) as tmp, open(tmp, "wb") as fh:
             pickle.dump(self, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
     @staticmethod

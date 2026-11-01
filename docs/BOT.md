@@ -33,11 +33,14 @@ in Telegram's `/` menu.
 | `/next spirit vs liquid: axe, pudge, lion` | Pro draft: most likely next pick/ban. First team = the one that acts first; heroes = everything picked/banned so far, in order |
 | `/odds` | Title chances if the 16 strongest active teams played a TI today |
 | `/odds spirit, falcons, liquid, ...` | Title chances for 8+ teams you list |
+| `/journal` | How the pro predictions did on new matches (predicted before the models saw them) |
 | `/status` | Which models are loaded, how much data, running jobs |
 | `/collect public 300` | Admin: download ~26 k public games (300 API calls ≈ 5 min) |
 | `/collect pro` | Admin: download new pro matches (+ team, league and player names) |
 | `/live` | Pro games being played right now, with live win % |
 | `/ingame spirit vs liquid 25 +5k towers 3-1` | Live win % from a scoreboard you type |
+| `/refresh` | Admin: the nightly pro refresh now: new matches → journal → retrain (~10 min) |
+| `/replay BLAST SLAM VIII` | Admin: how the bot would have done at a past event (~4 min) |
 | `/train counterpick` | Admin: update the counter-picker statistics now (it also does this every hour by itself) |
 | `/train livepro` | Admin: retrain the live predictor (~3 min) |
 | `/train tournament` | Admin: re-run the TI backtest (~5 min); `/odds` itself always uses the latest pro model |
@@ -47,8 +50,9 @@ in Telegram's `/` menu.
 
 Hero names can be full (`Phantom Assassin`), partial (`phantom a`) or initials (`pa`).
 
-**A good daily routine:** `/collect pro` then `/train pro` and `/train draft` (a few minutes each), and
-nothing for the counter-picker: it downloads new public games every hour by itself.
+**Nothing to do daily:** the pro models refresh themselves every night at 05:00 (new
+matches → `/journal` → retrain), and the counter-picker updates itself every hour. The
+laptop has to be on (and awake) for that.
 The model reloads by itself after training, so there's no need to restart the bot.
 
 ## Who can use it

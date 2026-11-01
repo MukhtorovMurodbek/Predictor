@@ -116,6 +116,7 @@ class ProState:
         self.vs_wins = np.zeros((N_HEROES, N_HEROES))
         self.team_roster: dict = {}  # team_id -> (time, 5 account ids) of its latest match
         self.team_results: dict = defaultdict(list)  # team_id -> [(time, opponent, won)]
+        self.player_team: dict = {}  # account_id -> (time, team_id) of the player's latest match
 
     # ---- features ------------------------------------------------------------------------
 
@@ -213,6 +214,8 @@ class ProState:
             for h in heroes:
                 self.team_hero.add((team, h), won, self.team_hero.weight(t))
             self.team_roster[team] = (t, tuple(players))
+            for p in players:
+                self.player_team[p] = (t, team)
             self.team_results[team].append((t, opp, bool(won)))
 
         if rt is not None and dt is not None:

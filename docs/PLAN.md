@@ -279,6 +279,11 @@ Plan: rules first, then the cloud model, then show the translation, then run the
 The model only *chooses a command and fills in its arguments*; the normal command code
 checks everything. Needs: a Groq API key (console.groq.com, free) in `.env` as `groq_api`.
 
+### Real-world validation ✅ (2026-11-01) → [VALIDATION.md](VALIDATION.md)
+Tested end to end in Telegram, against Dotabuff and Dota2ProTips, and by replaying real
+events with frozen models. Led to: transfer-aware rosters, a league-tier filter, atomic saves,
+`/replay`, and a nightly refresh with a prediction journal (`refresh.py`, `/journal`).
+
 ### Phase 6 — Universal model (last)
 - One model with shared hero/team embeddings and several output heads: counter-pick scores,
   draft win, next pick, live win, tournament.

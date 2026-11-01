@@ -18,6 +18,7 @@ import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 from .. import MODELS_DIR
+from ..io import atomic_write
 from ..data import DRAFTS_PATH, PLAYER_COLS, R_COLS, D_COLS
 from ..data.teams import find_team
 from ..pro.dataset import load_pro_matches
@@ -50,6 +51,7 @@ class MatchRecord:
     actions: list  # [(is_pick, side, hero)] in draft order
     cm: bool  # a full Captains Mode draft: 24 actions, 5 picks + 7 bans per team
     order: list  # [(is_pick, "A"/"B")] for each action, "A" = the team that acted first
+    match_id: int = 0
 
 
 def _team(x):
@@ -88,6 +90,7 @@ def load_records() -> list[MatchRecord]:
                 actions=actions,
                 cm=cm,
                 order=order,
+                match_id=int(row.match_id),
             )
         )
     return records
@@ -206,8 +209,7 @@ class DraftModel:
         return [(int(cand[i]), float(share[i])) for i in order]
 
     def save(self, path: Path = MODEL_PATH) -> None:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "wb") as fh:
+        with atomic_write(path) as tmp, open(tmp, "wb") as fh:
             pickle.dump(self, fh, protocol=pickle.HIGHEST_PROTOCOL)
 
     @staticmethod

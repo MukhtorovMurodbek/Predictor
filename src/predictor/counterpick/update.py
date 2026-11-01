@@ -24,6 +24,7 @@ import pandas as pd
 from ..data import HEROES_PATH, PATCHES_PATH, SOURCES
 from ..data.collect import collect_heroes, collect_public
 from ..data.opendota import OpenDota
+from ..io import atomic_write
 from . import stats
 from .stats import Counts, WINDOW_DAYS, day_path
 
@@ -112,7 +113,8 @@ def update(max_calls: int = CALLS_PER_UPDATE) -> str:
                 save_state(state)
         kept = prune_raw(df)
         if len(kept) < len(df):
-            kept.to_parquet(path, index=False)
+            with atomic_write(path) as tmp:
+                kept.to_parquet(tmp, index=False)
         return (
             f"counter-picker update: +{len(new):,} games ({calls} API calls), {len(days)} day table(s) updated, "
             f"raw file keeps {len(kept):,} games from the last {RAW_KEEP_DAYS} days"
