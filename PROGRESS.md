@@ -12,7 +12,7 @@ _Last updated: 2026-11-01_
   menu with one intro command per model → [docs/BOT.md](docs/BOT.md)
 
 ## 1. Counter-picker (public games) 👤 Asilbek (Codex + website)
-- 🔨 New direction: plain statistics over the last 3 months (STRATZ API, needs a token)
+- 🔨 New direction: plain statistics over the last 3 months; STRATZ authentication and raw matchup queries work, but rank, time window and patch semantics remain unverified, so STRATZ is not used for recommendations yet → [connection test](docs/STRATZ-CONNECTION.md)
 - ✅ Data: 44 k public Divine games
 - ✅ Model: counter + synergy tables, beats the hero-only baseline (56.5% vs 56.0%)
 - ✅ Hosted in the bot: `/counterpick` `/pick` `/counters` `/hero`
