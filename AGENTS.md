@@ -109,7 +109,8 @@ way (`tests/test_counterpick_engine.py` checks the counting against `statistics.
 
 Put new website code in `web/` and import models from the package
 (`from predictor.counterpick import MatchupStats`) instead of copying code. Note: the raw file
-`data/raw/public_matches.parquet` now only keeps the **last 7 days**. The 90-day numbers live in
+`data/raw/public_matches.parquet` keeps up to the **last 60 days**; historical recovery may
+still be in progress. The 90-day numbers live in
 the daily tables `data/counterpick/*.npz` (`MatchupStats.from_daily(...)`). If the site
 needs an HTTP API, add a small FastAPI app under `web/` that loads the same model files.
 Don't change model file formats without updating `bot.py` too.

@@ -5,11 +5,10 @@
 
 Each update:
 1. Forward: download public games newer than the newest one we have (all ranks).
-2. Backfill: spend the rest of the call budget on games older than the oldest one we ever
-   fetched, until the 90-day window is full.
-3. Add the new games' counts to the daily tables (data/counterpick/YYYY-MM-DD.npz). Every game
-   is new by construction (newer than the newest, or older than the oldest), so adding never
-   counts a game twice.
+2. Backfill: recover the last 60 days of raw games, then continue the 90-day daily tables.
+   A separate cursor lets existing installations re-fetch games previously pruned from raw.
+3. Add only games outside the already-counted ID range to daily tables. The 60-day recovery
+   may re-fetch previously counted games; these must not be added to daily tables again.
 4. Delete raw games older than RAW_KEEP_DAYS from public_matches.parquet (their counts stay in
    the daily tables), so the raw file stays small.
 """
@@ -28,7 +27,7 @@ from ..io import atomic_write
 from . import stats
 from .stats import Counts, WINDOW_DAYS, day_path
 
-RAW_KEEP_DAYS = 7
+RAW_KEEP_DAYS = 60
 CALLS_PER_UPDATE = 100  # at most ~8,700 games per hourly update
 MIN_RANK = 10  # all ranks: the counter-picker is for regular players
 KEEP_QUOTA = 400  # leave this many OpenDota calls per day for the pro models and /live
@@ -90,15 +89,36 @@ def update(max_calls: int = CALLS_PER_UPDATE) -> str:
         newest = int(before["match_id"].max()) if len(before) else None
         state = load_state()
         oldest = state.get("oldest_id", int(before["match_id"].min()) if len(before) else None)
+        # This cursor is independent of the daily tables: an older version pruned raw
+        # games even while backfilling the 90-day tables. It is saved even when all
+        # fetched rows are ineligible or older than the retention cutoff.
+        if "raw_oldest_id" not in state and len(before):
+            first_raw = before.loc[before["match_id"].idxmin()]
+            state.update(raw_oldest_id=int(first_raw["match_id"]), raw_oldest_time=int(first_raw["start_time"]))
         api = OpenDota()
         if not HEROES_PATH.exists() or not PATCHES_PATH.exists():
             collect_heroes(api)
 
         calls = collect_public(api, max_calls, MIN_RANK, save_every=max_calls + 1, stop_at_id=newest, min_quota=KEEP_QUOTA)
-        window_start = (datetime.now(timezone.utc) - timedelta(days=WINDOW_DAYS)).timestamp()
-        backfill = oldest is not None and state.get("oldest_time", float("inf")) > window_start
-        if backfill and calls < max_calls:
-            calls += collect_public(api, max_calls - calls, MIN_RANK, save_every=max_calls + 1, start_before=oldest, min_quota=KEEP_QUOTA)
+        now = datetime.now(timezone.utc)
+        raw_start = (now - timedelta(days=RAW_KEEP_DAYS)).timestamp()
+        window_start = (now - timedelta(days=WINDOW_DAYS)).timestamp()
+        raw_cursor = state.get("raw_oldest_id")
+        recover_raw = raw_cursor is not None and state.get("raw_oldest_time", float("inf")) > raw_start
+        daily_backfill = oldest is not None and state.get("oldest_time", float("inf")) > window_start
+        cursor = raw_cursor if recover_raw else (oldest if daily_backfill else None)
+        page_cursor = None
+
+        def record_page(batch):
+            nonlocal page_cursor
+            first = min(batch, key=lambda row: row["match_id"])
+            # A missing timestamp cannot prove the boundary has been reached.
+            timestamp = first.get("start_time")
+            page_cursor = (int(first["match_id"]), int(timestamp) if timestamp else None)
+
+        if cursor is not None and calls < max_calls:
+            calls += collect_public(api, max_calls - calls, MIN_RANK, save_every=max_calls + 1,
+                                    start_before=cursor, min_quota=KEEP_QUOTA, on_page=record_page)
 
         df = pd.read_parquet(path) if path.exists() else before
         is_new = (df["match_id"] > newest) if newest is not None else pd.Series(True, index=df.index)
@@ -110,7 +130,25 @@ def update(max_calls: int = CALLS_PER_UPDATE) -> str:
             first = df.loc[df["match_id"].idxmin()]
             if oldest is None or first["match_id"] < oldest:
                 state.update(oldest_id=int(first["match_id"]), oldest_time=int(first["start_time"]))
-                save_state(state)
+        if page_cursor is not None:
+            page_id, page_time = page_cursor
+            if recover_raw:
+                state["raw_oldest_id"] = page_id
+                if page_time is None:
+                    state.pop("raw_oldest_time", None)
+                else:
+                    state["raw_oldest_time"] = page_time
+            # Also advance the daily cursor over pages with no eligible games.
+            if oldest is None or page_id < oldest:
+                state["oldest_id"] = page_id
+                if page_time is None:
+                    state.pop("oldest_time", None)
+                else:
+                    state["oldest_time"] = page_time
+        if "raw_oldest_id" not in state and len(df):
+            first_raw = df.loc[df["match_id"].idxmin()]
+            state.update(raw_oldest_id=int(first_raw["match_id"]), raw_oldest_time=int(first_raw["start_time"]))
+        save_state(state)
         kept = prune_raw(df)
         if len(kept) < len(df):
             with atomic_write(path) as tmp:

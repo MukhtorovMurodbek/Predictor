@@ -41,5 +41,13 @@ the ranking rules here, change `engine.py` as well. The bot's other counter-pick
 `/counterpick`, uses 90-day daily tables and Dotabuff-style edges.
 
 Data: both read the public games that the bot downloads every hour. The raw file
-`data/raw/public_matches.parquet` only keeps the **last 7 days** (older games live on as
-daily counts in `data/counterpick/`), so this website and `/apick` see the last 7 days.
+`data/raw/public_matches.parquet` keeps up to **60 days**. `/apick` limits results to the
+preceding 60 days and reports the actual dates of the eligible matches. The bot backfills
+previously removed raw games when the hourly OpenDota request budget has capacity after
+fetching newer games. If newer games exhaust the budget, backfill can stall. The
+full period may take time to collect and is a sample, not every public match. Rank and
+patch filters can reduce coverage further. The website reads the available raw data; restart
+its server after an update. The 90-day daily counts remain in `data/counterpick/`.
+
+Keeping more raw games increases disk and memory use. Large datasets can slow collection,
+website startup, and `/apick` calculations; monitor the bot host as history grows.
