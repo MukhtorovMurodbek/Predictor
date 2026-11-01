@@ -289,11 +289,56 @@ Tested end to end in Telegram, against Dotabuff and Dota2ProTips, and by replayi
 events with frozen models. Led to: transfer-aware rosters, a league-tier filter, atomic saves,
 `/replay`, and a nightly refresh with a prediction journal (`refresh.py`, `/journal`).
 
-### Phase 6 — Universal model (last)
-- One model with shared hero/team embeddings and several output heads: counter-pick scores,
-  draft win, next pick, live win, tournament.
-- It only replaces a separate model in the bot if it matches or beats it on that model's
-  evaluation.
+### Phase 6 — General predictor (was "universal model") 🔨 idea tested 2026-11-01
+
+**Murodbek's idea:** a language model that understands English, learns every hero's skills and,
+when a patch changes a hero, predicts the new counters from the skills instead of statistics.
+It should also do everything the other models do. Laptop: RTX 3050 Ti (4 GB VRAM), 16 GB RAM.
+
+Every path, and what it gets us:
+
+| Path | On our laptop? | Verdict |
+|---|---|---|
+| Train our own language model from scratch | No: needs thousands of GPU-days and billions of words | ✗ |
+| Fine-tune a small open model (1–3B) with QLoRA | Yes: 1.5B comfortably, 3B at the limit, hours per run | ✗ for predicting. It could only learn counters from our statistics, and does that worse than the statistics |
+| Run a ready-made small model locally (Ollama: Qwen3 4B, Llama 3.2 3B, 4-bit, ~2.5 GB) | Yes, ~20–40 words/s | ✓ for understanding English and turning it into our commands; knows little Dota |
+| A big free model in the cloud (Groq: Llama 3.3 70B, GPT-OSS 120B, ...) | Nothing runs locally | ✓ best English and Dota knowledge, good explanations; needs a free key + internet |
+| Skills → counters, no language model (`general/skills.py`) | Yes, CPU, seconds | Tested below: works, but weakly |
+| React to patches with fast statistics | Already built | ✓ best: ~550k games a day, so a new patch has usable counters after one day |
+
+**The test** (`python -m predictor.general.skills`): 8.0 M public games from Oct 18 to Nov 1, 127
+heroes. Hide every statistic of a tenth of the heroes, predict their counters from skills
+alone (base stats, roles, ability types, damage types, BKB/dispel rules, keywords and the
+ability text), compare with the real matchups, and repeat for every tenth:
+
+| Hero description used | Correlation with the real matchups | Real top-5 counters found |
+|---|---|---|
+| Random guess | 0.00 | 4% |
+| Base stats + roles | 0.13 | 10% |
+| + abilities (numbers, keywords, text) | **0.22** | **15%** |
+
+Example: with Storm Spirit's statistics hidden, the picks included Anti-Mage, Meepo, Huskar and
+Riki, the real #1, #2, #4 and #5 counters. With Phantom Lancer's hidden, it got Axe (#3) and
+Underlord (#6) right, but also suggested Chen (#101). Statistics are much stronger. The same
+matchups measured on odd days and on even days agree at r = 0.81.
+
+**Verdict:**
+- Counters from skills alone: possible, about 3.5× better than guessing, but still mostly
+  wrong. Fine as a fun guess for a brand-new or reworked hero, not as the counter-picker.
+- After a patch, fast statistics win. We now count every public game, so one day after a
+  patch each matchup has ~1,700 games (±2.4 points); three days give ±1.4.
+- The English part is very doable: a language model that understands the question, calls
+  our models as tools and explains the answer with the heroes' ability texts.
+
+**Plan** (starts once we pick Groq or a local model):
+1. `/ask` in plain English → the language model picks the tool and arguments (counter-pickers,
+   pro predictor, draft, live, tournament) → the bot runs it → the model writes the answer
+   using those numbers.
+2. "Why?": give the model both heroes' ability descriptions and the matchup numbers, and let it
+   explain the counter.
+3. Patch notes: paste them in, and the model finds the heroes that changed. The bot shows
+   patch-filtered statistics once games exist, and the skills guess for reworked heroes.
+4. Test: 100 English questions with the expected command; target ≥ 95% right.
 
 ---
 
