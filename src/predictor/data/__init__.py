@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 import numpy as np
 import pandas as pd
 
-from . import DATA_DIR, RAW_DIR
+from .. import DATA_DIR, RAW_DIR
 
 R_COLS = [f"r{i}" for i in range(5)]
 D_COLS = [f"d{i}" for i in range(5)]
@@ -21,7 +21,7 @@ SOURCES = {"pro": RAW_DIR / "pro_matches.parquet", "public": RAW_DIR / "public_m
 
 def load_heroes() -> dict[int, str]:
     if not HEROES_PATH.exists():
-        raise FileNotFoundError("data/heroes.json missing, run: python -m predictor.collect heroes")
+        raise FileNotFoundError("data/heroes.json missing, run: python -m predictor.data.collect heroes")
     return {h["id"]: h["localized_name"] for h in json.loads(HEROES_PATH.read_text("utf-8"))}
 
 
@@ -41,7 +41,7 @@ def load_matches(source: str = "public", patch: str | None = None) -> pd.DataFra
     for name in names:
         path = SOURCES[name]
         if not path.exists():
-            raise FileNotFoundError(f"{path} missing, run: python -m predictor.collect {name}")
+            raise FileNotFoundError(f"{path} missing, run: python -m predictor.data.collect {name}")
         frames.append(pd.read_parquet(path).assign(source=name))
     df = pd.concat(frames, ignore_index=True)
     if patch:

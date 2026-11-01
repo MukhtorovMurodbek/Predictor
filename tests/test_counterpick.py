@@ -1,6 +1,6 @@
 import numpy as np
 
-from predictor.counters import CounterModel
+from predictor.counterpick import CounterModel
 from predictor.data import resolve_heroes
 
 HEROES = {i: f"Hero {i}" for i in range(1, 21)}

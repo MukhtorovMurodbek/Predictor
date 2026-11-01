@@ -3,75 +3,85 @@
 [![tests](https://github.com/MukhtorovMurodbek/Predictor/actions/workflows/tests.yml/badge.svg)](https://github.com/MukhtorovMurodbek/Predictor/actions/workflows/tests.yml)
 [![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-Dota 2 draft & match predictor: a **hero counter-picker** first, then **win prediction**
-for drafts, live games and whole tournaments (The International).
+Dota 2 models, all hosted through one Telegram bot: a **hero counter-picker** for regular
+games, then **pro match predictors** (draft, next pick, live game, tournament winner), and
+finally one **universal model** that does everything.
 
-See **[docs/PLAN.md](docs/PLAN.md)** for the full plan, hardware notes and roadmap, and
-**[CONTRIBUTING.md](CONTRIBUTING.md)** for how we work together.
+- **[docs/PLAN.md](docs/PLAN.md)**: roadmap, what's done, what's next
+- **[docs/BOT.md](docs/BOT.md)**: using and hosting the Telegram bot
+- **[CONTRIBUTING.md](CONTRIBUTING.md)**: how we work together, how to add a model
 
-## Status
+## Models
 
-Phase 1, counter-picker MVP: data collection, counter/synergy matrices, CLI recommender,
-evaluation.
+| # | Model | Trained on | Status | Bot commands |
+|---|---|---|---|---|
+| 1 | Counter-picker | public ranked games | ✅ live in the bot | `/pick` `/counters` `/hero` |
+| 2 | Draft win predictor | pro matches only | ⬜ next | — |
+| 3 | Pro next-pick predictor | pro drafts | ⬜ | — |
+| 4 | Live in-game predictor | pro match timelines | ⬜ | — |
+| 5 | Tournament (TI) predictor | pro results | ⬜ | — |
+| 6 | Universal model | everything | ⬜ last | — |
 
-## Quickstart
+Each model is built, then hosted in the bot, before the next one starts.
 
-Needs Python 3.11+.
+## Setup (everyone)
+
+You need Python 3.11+ and git.
 
 ```bash
 git clone https://github.com/MukhtorovMurodbek/Predictor.git
 cd Predictor
 python -m venv .venv
-# Windows: .venv\Scripts\activate    macOS/Linux: source .venv/bin/activate
+```
+
+Activate the environment every time you open a new terminal:
+- Windows: `.venv\Scripts\activate`
+- macOS/Linux: `source .venv/bin/activate`
+
+```bash
 pip install -e ".[dev]"
+pytest                # should say "passed"
 ```
 
-### 1. Collect data (OpenDota, free tier: 60 calls/min, 3,000/day)
+## Command line
+
+The same things the bot does, from a terminal:
 
 ```bash
-python -m predictor.collect heroes                       # hero list + patch dates
-python -m predictor.collect pro --since 2025-01-01       # all pro matches (~10 calls)
-python -m predictor.collect public --calls 500 --min-rank 70   # ~40k Ancient+ games, ~9 min
+# data (OpenDota free tier: 60 calls/min, 3,000/day per internet connection)
+python -m predictor.data.collect heroes
+python -m predictor.data.collect pro --since 2025-01-01
+python -m predictor.data.collect public --calls 500 --min-rank 70
+
+# model 1: counter-picker
+python -m predictor.counterpick.train
+python -m predictor.counterpick.evaluate
+python -m predictor.counterpick.recommend --enemies "pa, pudge, lion" --allies "cm"
+python -m predictor.counterpick.recommend --counters "Phantom Assassin"
+
+# the bot (host only, see docs/BOT.md)
+python -m predictor.bot
 ```
-
-Data goes to `data/` (not committed). Run `collect public` again on later days to grow the
-dataset. Every run adds to the same file and skips duplicates.
-
-### 2. Build the counter model
-
-```bash
-python -m predictor.counters --source public             # -> models/counters_public.npz
-python -m predictor.counters --source pro --patch 7.41
-```
-
-### 3. Ask for picks
-
-```bash
-python -m predictor.recommend --enemies "Phantom Assassin, Pudge, Lion" --allies "Crystal Maiden"
-python -m predictor.recommend --counters "Phantom Assassin"
-```
-
-### 4. Check whether it actually predicts anything
-
-```bash
-python -m predictor.evaluate --source public
-```
-
-This compares against "always Radiant" and a per-hero-only logistic regression, on
-held-out **newer** matches.
 
 ## Layout
 
 ```
 src/predictor/
-  opendota.py   rate-limited OpenDota API client
-  collect.py    data collectors (pro via explorer SQL, public via /publicMatches)
-  data.py       loading matches + hero name lookup
-  counters.py   counter & synergy matrices, draft scoring, training CLI
-  recommend.py  counter-pick CLI
-  evaluate.py   time-split evaluation vs baselines
-docs/PLAN.md    plan & roadmap
+  data/            shared: OpenDota client, collectors, loading matches, hero names
+  counterpick/     model 1: model.py, train.py, evaluate.py, recommend.py (CLI), bot.py (bot commands)
+  bot/             Telegram bot: app.py, auth.py (allowed users), admin.py (/collect /train), registry.py (hosted models)
+  draft/ ...       next models follow the same pattern
+tests/             pytest tests, run automatically on GitHub for every push
+scripts/           run_bot.bat: double-click to start the bot on Windows
+docs/              plan and bot guide
+data/, models/     downloaded data and trained models (not in git, see below)
 ```
+
+## Where models and data live
+
+Code is in git. Trained models and datasets are **not**: git keeps every version forever, so
+the repo would grow huge. They're shared as **GitHub Release** assets of this repo when we
+need to share them. Each person can also rebuild them with the commands above.
 
 ## License & data
 

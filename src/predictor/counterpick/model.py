@@ -12,11 +12,8 @@ treated as a hard counter.
 
 A draft is scored as   intercept + w_base*Σbase + w_vs*Σcounters + w_syn*Σsynergy,
 with the four numbers fitted by logistic regression, so the scores are win probabilities.
-
-    python -m predictor.counters --source public
 """
 
-import argparse
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,8 +21,7 @@ import numpy as np
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 
-from . import MODELS_DIR
-from .data import hero_arrays, load_heroes, load_matches
+from .. import MODELS_DIR
 
 CHUNK = 200_000
 
@@ -192,25 +188,3 @@ class CounterModel:
 
 def model_path(source: str) -> Path:
     return MODELS_DIR / f"counters_{source}.npz"
-
-
-def main(argv=None):
-    p = argparse.ArgumentParser(description="Build hero counter/synergy matrices")
-    p.add_argument("--source", choices=["public", "pro", "all"], default="public")
-    p.add_argument("--patch", help="only use matches from this patch, e.g. 7.41")
-    p.add_argument("--prior", type=float, default=150.0, help="smoothing strength, in games")
-    args = p.parse_args(argv)
-
-    df = load_matches(args.source, args.patch)
-    if df.empty:
-        raise SystemExit("no matches for that source/patch")
-    model = CounterModel.fit(*hero_arrays(df), load_heroes(), prior=args.prior)
-    path = model_path(args.source)
-    model.save(path)
-    w = model.weights
-    print(f"fit on {len(df)} matches -> {path}")
-    print(f"weights: intercept {w[0]:+.3f}, base {w[1]:.2f}, counter {w[2]:.2f}, synergy {w[3]:.2f}")
-
-
-if __name__ == "__main__":
-    main()

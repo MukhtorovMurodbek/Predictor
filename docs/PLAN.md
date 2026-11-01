@@ -68,6 +68,7 @@ people we get three quotas. That's a natural way to split collection work.
 | **OpenDota `/api/live`**, Steam `GetLiveLeagueGames` | Currently live top / league games | For real-time demos. Check what still works when we get there. |
 | **Dota 2 Game State Integration (GSI)** | Live JSON from the Dota client to localhost while you play or **spectate** | The cleanest real-time feed. Spectate a pro game in-client and our app gets draft + game state. |
 | **STRATZ GraphQL API** | Alternative stats, free token, matchup data | Backup if OpenDota limits hurt. |
+| ~~Dotabuff~~ | — | Suggested by Asilbek, but there's **no public API**. Scraping is against their terms and blocked by Cloudflare. Their numbers come from the same Valve match data OpenDota and STRATZ give us legally. |
 | **Patches**: `/api/constants/patch` | Patch dates | Meta shifts every patch: weight recent patches. |
 
 **Patch counts in the pro DB:** 7.39 ≈ 17.9 k, 7.40 ≈ 7.9 k, 7.41 ≈ 8.7 k matches.
@@ -78,15 +79,29 @@ pair). So: **learn counters from high-rank public games (volume), then adjust fo
 
 ## 3. Roadmap
 
-Each phase ends with something that works and that we can demo. Do them in order. Phase 1 is
-the weekend.
+**Team decisions (2026-11-01):**
+- One **separate, high-precision model per task** first. A **universal model** comes last
+  (phase 6).
+- The order for every model is **build → evaluate → host in the Telegram bot → next model**.
+  All models run in one bot on the host laptop ([docs/BOT.md](BOT.md)).
+- The **counter-picker uses public games** (it's for regular players). **All predictors use
+  pro matches only** (Asilbek).
 
-### Phase 1 — Counter-picker MVP (this weekend) ⬅ we are here
+Each phase ends with something that works and that we can demo. Do them in order.
+
+### Phase 1 — Counter-picker (public games) ✅ hosted
 - [x] Rate-limited OpenDota client
 - [x] Collectors: pro matches (explorer SQL) + public high-rank matches
-- [x] Counter & synergy matrices with Bayesian smoothing (`predictor.counters`)
+- [x] Counter & synergy matrices with Bayesian smoothing (`predictor.counterpick`)
 - [x] CLI: `recommend --enemies ... --allies ...` and `--counters <hero>`
-- [x] Evaluation on a time-based holdout vs baselines (`predictor.evaluate`)
+- [x] Evaluation on a time-based holdout vs baselines
+- [x] **Hosted in the Telegram bot**: `/pick`, `/counters`, `/hero`, plus admin `/collect`, `/train`, `/evaluate`
+- [ ] **Rank brackets**: separate tables for Herald–Crusader, Archon–Legend, Ancient–Divine and
+      Immortal. The meta and counters differ a lot by rank. Collect with `min_rank`/`max_rank`;
+      the bot asks for or remembers each user's rank.
+- [ ] **Personal hero pool**: link your Dota account ID. The bot pulls your per-hero games and
+      win rate from OpenDota and only suggests heroes you can actually play (or marks them ⭐).
+- [ ] **Role / position**: don't suggest a 4th carry. Tag heroes by position from public data.
 - [ ] Each of us collects public matches with our own quota → ~200 k+ matches
 - [ ] Sanity check: do the top counters agree with what we know as players?
 - [ ] Share the dataset (GitHub Release attachment or Kaggle / Hugging Face dataset)
@@ -118,13 +133,12 @@ Known issues / next steps:
 - Grow public data to 200 k+ matches (all three of us collecting daily) and re-run `evaluate`.
 - Role awareness: right now it can suggest a 4th carry.
 
-### Phase 2 — Learned draft model (week 2–3)
-- Logistic regression on hero one-hots + pairwise features → then **LightGBM**
-- Neural model: hero embeddings (dim ~32) → team pooling or a tiny transformer over 10 heroes
-  → P(radiant win). PyTorch, runs on the 3050 Ti.
-- Train on public, **fine-tune on pro**, add patch as a feature / sample weight by recency
-- Recommender switches to "ΔP when adding hero h" (role-aware: don't suggest a 5th carry)
-- Metrics: log loss, Brier, calibration plot. Accuracy alone is misleading.
+### Phase 2 — Pro draft win predictor ⬅ next
+- **Pro matches only.** Inputs: both drafts, both teams' recent form/rating, patch.
+  Players and teams matter more than heroes in pro play, so team strength is a key feature.
+- Logistic regression → **LightGBM** → small neural model (hero + team embeddings) on the 3050 Ti
+- Weight recent patches more. Metrics: log loss, Brier, calibration. Accuracy alone is misleading.
+- **Host:** `/predict <radiant heroes> vs <dire heroes>` (+ optional team names) in the bot
 
 ### Phase 3 — Pro draft assistant (week 3–4)
 - Data: pro `picks_bans` **with order** (explorer `picks_bans` table)
@@ -150,6 +164,12 @@ Known issues / next steps:
 - **Backtest on past TIs (2023, 2024, 2025, 2026)**: freeze data at the tournament start
   date and score our predictions
 - Compare with betting odds as a reality check
+
+### Phase 6 — Universal model (last)
+- One model with shared hero/team embeddings and several output heads: counter-pick scores,
+  draft win, next pick, live win, tournament.
+- It only replaces a separate model in the bot if it matches or beats it on that model's
+  evaluation.
 
 ---
 

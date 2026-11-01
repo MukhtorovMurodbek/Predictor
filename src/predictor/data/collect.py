@@ -1,8 +1,8 @@
 """Data collectors.
 
-    python -m predictor.collect heroes
-    python -m predictor.collect pro --since 2025-01-01
-    python -m predictor.collect public --calls 500 --min-rank 70
+    python -m predictor.data.collect heroes
+    python -m predictor.data.collect pro --since 2025-01-01
+    python -m predictor.data.collect public --calls 500 --min-rank 70
 """
 
 import argparse
@@ -12,8 +12,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from . import DATA_DIR, RAW_DIR
-from .data import D_COLS, HEROES_PATH, PATCHES_PATH, R_COLS, SOURCES, patch_for_times, to_unix
+from .. import DATA_DIR, RAW_DIR
+from . import D_COLS, HEROES_PATH, PATCHES_PATH, R_COLS, SOURCES, patch_for_times, to_unix
 from .opendota import OpenDota, QuotaExhausted
 
 # All Pick, Captains Mode, Random Draft, Single Draft, Captains Draft, Ranked All Pick.

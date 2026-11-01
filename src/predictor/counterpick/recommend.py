@@ -1,7 +1,7 @@
 """Counter-pick CLI.
 
-    python -m predictor.recommend --enemies "Phantom Assassin, Pudge" --allies "Crystal Maiden"
-    python -m predictor.recommend --counters "Phantom Assassin"
+    python -m predictor.counterpick.recommend --enemies "Phantom Assassin, Pudge" --allies "Crystal Maiden"
+    python -m predictor.counterpick.recommend --counters "Phantom Assassin"
 
 Scores are in log-odds. Near 50% win chance, +0.1 log-odds is about +2.5 percentage points.
 """
@@ -10,8 +10,8 @@ import argparse
 
 import pandas as pd
 
-from .counters import CounterModel, model_path
-from .data import resolve_heroes
+from .model import CounterModel, model_path
+from ..data import resolve_heroes
 
 
 def main(argv=None):
@@ -26,7 +26,7 @@ def main(argv=None):
 
     path = model_path(args.source)
     if not path.exists():
-        raise SystemExit(f"{path} missing, run: python -m predictor.counters --source {args.source}")
+        raise SystemExit(f"{path} missing, run: python -m predictor.counterpick.train --source {args.source}")
     model = CounterModel.load(path)
     names = model.hero_names
 
