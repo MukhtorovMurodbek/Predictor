@@ -3,7 +3,8 @@
     python -m predictor.counterpick.recommend --enemies "Phantom Assassin, Pudge" --allies "Crystal Maiden"
     python -m predictor.counterpick.recommend --counters "Phantom Assassin"
 
-Scores are in log-odds. Near 50% win chance, +0.1 log-odds is about +2.5 percentage points.
+Scores are Dotabuff-style edges in win-rate points: 0.05 = this hero wins 5 points more often
+than usual in these matchups.
 """
 
 import argparse
@@ -47,7 +48,6 @@ def main(argv=None):
     print("Allies: ", ", ".join(names[h] for h in allies) or "-")
     print("Enemies:", ", ".join(names[h] for h in enemies) or "-")
     recs = model.recommend(allies, enemies, banned, top=args.top)
-    recs["≈Δwin%"] = (recs["score"] * 25).map("{:+.1f}".format)
     print(recs.to_string())
 
 

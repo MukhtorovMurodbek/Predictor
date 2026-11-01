@@ -9,14 +9,13 @@ from telegram.ext import ContextTypes
 
 from ..data import resolve_heroes
 from .evaluate import evaluate
-from .model import CounterModel, model_path, sigmoid
+from .model import CounterModel, model_path
 from .train import train
 
 NAME = "counterpick"
 TITLE = "Counter-picker"
 SUMMARY = "best heroes to pick in your own (non-pro) games"
 SOURCE = "public"  # counter-picks are for regular ranked games, not pro play
-PCT = 25  # log-odds -> percentage points of win chance, near 50%
 
 HELP = """<b>🛡 Counter-picker</b> (learned from public ranked games)
 /pick <i>enemies | allies | bans</i> — best heroes to pick
@@ -27,7 +26,7 @@ HELP = """<b>🛡 Counter-picker</b> (learned from public ranked games)
 /hero <i>hero</i> — win rate, best and worst matchups, best allies
    <code>/hero cm</code>
 Hero names can be full or short: <code>Phantom Assassin</code>, <code>phantom a</code>, <code>pa</code>, <code>cm</code>.
-Percentages are the rough change in your team's win chance."""
+Numbers are like Dotabuff's: how many win-rate points better (or worse) than usual a hero does in that matchup. Few games = less reliable."""
 
 
 def help_text() -> str:
@@ -48,7 +47,7 @@ def _model() -> CounterModel | None:
 
 
 def _pct(x: float) -> str:
-    return f"{x * PCT:+.1f}%"
+    return f"{x * 100:+.1f}%"
 
 
 def _names(model: CounterModel, ids) -> str:
@@ -95,13 +94,15 @@ async def pick(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     ]
     if bans:
         lines.append(f"<b>Banned:</b> {_names(model, bans)}")
-    lines += ["", "<b>Best picks</b>"]
+    lines += ["", "<b>Best picks</b> <i>(edge vs enemies, + with allies)</i>"]
     for i, r in recs.iterrows():
         line = f"{i + 1}. <b>{html.escape(r.hero)}</b> {_pct(r.score)}"
-        if enemies and r.best_vs_adv > 0:
-            line += f" · good vs {html.escape(r.best_vs)}"
+        if enemies and len(enemies) > 1 and r.best_vs_adv > 0:
+            line += f" · best vs {html.escape(r.best_vs)}"
+        if enemies:
+            line += f" <i>({int(r.games_vs):,} games)</i>"
         lines.append(line)
-    lines += ["", f"<i>From {model.n_matches:,} public games. Includes each hero's overall strength this patch.</i>"]
+    lines += ["", f"<i>From {model.n_matches:,} public games. Edge = win rate in these matchups minus what the heroes' usual win rates predict.</i>"]
     await update.effective_message.reply_text("\n".join(lines))
 
 
@@ -123,10 +124,10 @@ async def counters(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.effective_message.reply_text("\n".join(lines))
 
 
-def _top(model: CounterModel, row: np.ndarray, games: np.ndarray, weight: float, h: int, best: bool, n=4) -> str:
+def _top(model: CounterModel, row: np.ndarray, games: np.ndarray, h: int, best: bool, n=4) -> str:
     cand = [k for k in model.hero_names if k != h and games[k] >= 30]
     cand.sort(key=lambda k: row[k], reverse=best)
-    return ", ".join(f"{html.escape(model.hero_names[k])} {_pct(weight * row[k])}" for k in cand[:n]) or "—"
+    return ", ".join(f"{html.escape(model.hero_names[k])} {_pct(row[k])}" for k in cand[:n]) or "—"
 
 
 async def hero(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
@@ -140,14 +141,13 @@ async def hero(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     except ValueError as e:
         await update.effective_message.reply_text(html.escape(str(e)))
         return
-    _, _, w_vs, w_syn = model.weights
-    adv = model.advantage
+    vs, with_ = model.edges()
     lines = [
         f"<b>{html.escape(model.hero_names[h])}</b>",
-        f"Win rate: {sigmoid(model.base[h]):.1%} over {int(model.hero_games[h]):,} games",
-        f"<b>Strong vs:</b> {_top(model, adv[h], model.vs_games[h], w_vs, h, best=True)}",
-        f"<b>Weak vs:</b> {_top(model, adv[h], model.vs_games[h], w_vs, h, best=False)}",
-        f"<b>Best allies:</b> {_top(model, model.with_[h], model.with_games[h], w_syn, h, best=True)}",
+        f"Win rate: {model.win_rates()[h]:.1%} over {int(model.hero_games[h]):,} games",
+        f"<b>Strong vs:</b> {_top(model, vs[h], model.vs_games[h], h, best=True)}",
+        f"<b>Weak vs:</b> {_top(model, vs[h], model.vs_games[h], h, best=False)}",
+        f"<b>Best allies:</b> {_top(model, with_[h], model.with_games[h], h, best=True)}",
     ]
     await update.effective_message.reply_text("\n".join(lines))
 

@@ -24,6 +24,7 @@ from sklearn.linear_model import LogisticRegression
 from .. import MODELS_DIR
 
 CHUNK = 200_000
+EDGE_PRIOR = 100.0  # virtual games that pull small matchup samples towards "no edge"
 
 
 def logit(p):
@@ -63,6 +64,9 @@ class CounterModel:
     with_games: np.ndarray  # (H, H)
     weights: np.ndarray  # [intercept, w_base, w_vs, w_syn]
     n_matches: int = 0
+    hero_wins: np.ndarray | None = None  # raw counts, for the Dotabuff-style edges below
+    vs_wins: np.ndarray | None = None
+    with_wins: np.ndarray | None = None
 
     # ---- fitting -------------------------------------------------------------------------
 
@@ -105,7 +109,11 @@ class CounterModel:
         np.fill_diagonal(with_, 0.0)
         np.fill_diagonal(with_games, 0.0)
 
-        return cls(hero_names, hero_games, base, vs, vs_games, with_, with_games, np.array([0, 1, 1, 1.0]), len(y))
+        np.fill_diagonal(with_wins, 0.0)
+        return cls(
+            hero_names, hero_games, base, vs, vs_games, with_, with_games, np.array([0, 1, 1, 1.0]), len(y),
+            hero_wins=hero_wins, vs_wins=vs_wins, with_wins=with_wins,
+        )
 
     # ---- scoring -------------------------------------------------------------------------
 
@@ -125,35 +133,60 @@ class CounterModel:
         """P(Radiant wins) for full 5v5 drafts."""
         return sigmoid(self.weights[0] + self.draft_terms(R, D) @ self.weights[1:])
 
+    def win_rates(self, prior: float = 50.0) -> np.ndarray:
+        """Each hero's overall win rate (pulled towards 50% if it has few games)."""
+        if self.hero_wins is None:
+            raise ValueError("this model file is too old, retrain it: /train counterpick")
+        return (self.hero_wins + 0.5 * prior) / (self.hero_games + prior)
+
+    def edges(self, prior: float = EDGE_PRIOR) -> tuple[np.ndarray, np.ndarray]:
+        """Dotabuff-style matchup numbers, in win-rate points (0.05 = +5 points):
+
+        vs[a, b]    a's win rate against b, minus what a's and b's usual win rates predict
+        with_[a, b] a's win rate with b on its team, minus what their usual win rates predict
+
+        Pairs with few games are pulled towards 0 (`prior` = how many virtual games).
+        """
+        if self.vs_wins is None:
+            raise ValueError("this model file is too old, retrain it: /train counterpick")
+        wr = self.win_rates()
+        exp_vs = 0.5 + (wr[:, None] - wr[None, :]) / 2
+        exp_with = np.clip(wr[:, None] + wr[None, :] - 0.5, 0.01, 0.99)
+        vs = (self.vs_wins + prior * exp_vs) / (self.vs_games + prior) - exp_vs
+        with_ = (self.with_wins + prior * exp_with) / (self.with_games + prior) - exp_with
+        np.fill_diagonal(with_, 0.0)
+        return vs, with_
+
     def recommend(self, allies=(), enemies=(), excluded=(), top: int = 10, min_games: int = 50) -> pd.DataFrame:
-        """Rank every free hero by how much it adds to our draft, given the heroes picked so far."""
+        """Rank free heroes by how much better than usual they do against these enemies and
+        with these allies (sum of matchup edges). A hero being strong in general doesn't count."""
         taken = set(allies) | set(enemies) | set(excluded)
         cand = np.array([h for h in self.hero_names if h not in taken and self.hero_games[h] >= min_games])
-        _, w_base, w_vs, w_syn = self.weights
-        adv = self.advantage
-        counter = adv[np.ix_(cand, list(enemies))] if enemies else np.zeros((len(cand), 0))
-        syn = self.with_[np.ix_(cand, list(allies))] if allies else np.zeros((len(cand), 0))
+        vs, with_ = self.edges()
+        counter = vs[np.ix_(cand, list(enemies))] if enemies else np.zeros((len(cand), 0))
+        syn = with_[np.ix_(cand, list(allies))] if allies else np.zeros((len(cand), 0))
         out = pd.DataFrame(
             {
                 "hero": [self.hero_names[h] for h in cand],
-                "base": w_base * self.base[cand],
-                "counter": w_vs * counter.sum(1),
-                "synergy": w_syn * syn.sum(1),
+                "counter": counter.sum(1),
+                "synergy": syn.sum(1),
+                "win_rate": self.win_rates()[cand],
+                "games_vs": self.vs_games[np.ix_(cand, list(enemies))].sum(1) if enemies else 0,
             }
         )
-        out["score"] = out[["base", "counter", "synergy"]].sum(axis=1)
+        out["score"] = out["counter"] + out["synergy"]
         if enemies:
             best = counter.argmax(1)
             out["best_vs"] = [self.hero_names[enemies[i]] for i in best]
-            out["best_vs_adv"] = w_vs * counter[np.arange(len(cand)), best]
+            out["best_vs_adv"] = counter[np.arange(len(cand)), best]
         return out.sort_values("score", ascending=False).head(top).reset_index(drop=True)
 
     def counters_for(self, enemy: int, top: int = 10, min_games: int = 30) -> pd.DataFrame:
-        """Heroes that do best against `enemy` (and their sample sizes)."""
+        """Heroes that do best against `enemy` (edge in win-rate points, and the sample size)."""
         cand = [h for h in self.hero_names if h != enemy and self.vs_games[h, enemy] >= min_games]
-        adv = self.weights[2] * self.advantage[cand, enemy]
+        vs, _ = self.edges()
         out = pd.DataFrame(
-            {"hero": [self.hero_names[h] for h in cand], "advantage": adv, "games": self.vs_games[cand, enemy].astype(int)}
+            {"hero": [self.hero_names[h] for h in cand], "advantage": vs[cand, enemy], "games": self.vs_games[cand, enemy].astype(int)}
         )
         return out.sort_values("advantage", ascending=False).head(top).reset_index(drop=True)
 
@@ -173,6 +206,7 @@ class CounterModel:
             with_=self.with_,
             with_games=self.with_games,
             weights=self.weights,
+            **{k: v for k, v in (("hero_wins", self.hero_wins), ("vs_wins", self.vs_wins), ("with_wins", self.with_wins)) if v is not None},
             n_matches=self.n_matches,
         )
 
@@ -183,6 +217,7 @@ class CounterModel:
         return cls(
             names, z["hero_games"], z["base"], z["vs"], z["vs_games"], z["with_"], z["with_games"],
             z["weights"], int(z["n_matches"]),
+            **{k: z[k] for k in ("hero_wins", "vs_wins", "with_wins") if k in z.files},
         )
 
 
