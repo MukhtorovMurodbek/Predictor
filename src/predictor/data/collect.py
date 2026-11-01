@@ -14,7 +14,7 @@ import pandas as pd
 
 from .. import DATA_DIR, RAW_DIR
 from . import (
-    D_COLS, DRAFTS_PATH, HEROES_PATH, LEAGUES_PATH, PATCHES_PATH, PLAYER_COLS, PLAYERS_PATH, R_COLS, SOURCES, TEAMS_PATH,
+    D_COLS, DRAFTS_PATH, HEROES_PATH, TIMELINES_PATH, LEAGUES_PATH, PATCHES_PATH, PLAYER_COLS, PLAYERS_PATH, R_COLS, SOURCES, TEAMS_PATH,
     patch_for_times, to_unix,
 )
 from .opendota import OpenDota, QuotaExhausted
@@ -81,6 +81,47 @@ def _pro_rows_to_wide(rows: list[dict]) -> pd.DataFrame:
     return heroes.join(players, how="inner").join(meta, how="inner").reset_index()
 
 
+# Per-minute gold/XP lead and the key events of each pro match, one row per match. Events are
+# packed as "time:what" separated by ";", where what is a building key
+# (npc_dota_badguys_tower1_mid = a Dire tower died), rosh2/rosh3 (Roshan killed by
+# Radiant/Dire) or fb<player_slot> (first blood, slot < 128 = Radiant).
+TIMELINE_SQL = """
+SELECT m.match_id, m.start_time, m.duration, m.radiant_gold_adv AS gold, m.radiant_xp_adv AS xp,
+  (SELECT string_agg(concat(o->>'time', ':',
+      CASE o->>'type' WHEN 'building_kill' THEN o->>'key'
+                      WHEN 'CHAT_MESSAGE_ROSHAN_KILL' THEN 'rosh' || (o->>'team')
+                      ELSE 'fb' || (o->>'player_slot') END), ';')
+   FROM unnest(m.objectives) o
+   WHERE o->>'type' IN ('building_kill', 'CHAT_MESSAGE_ROSHAN_KILL', 'CHAT_MESSAGE_FIRSTBLOOD')) AS events
+FROM matches m
+WHERE m.start_time >= {since} AND m.match_id < {cursor} AND m.radiant_gold_adv IS NOT NULL
+ORDER BY m.match_id DESC
+LIMIT {limit}
+"""
+
+
+def _continue_from(path: Path, since: str | None) -> int:
+    """Explicit date, or 3 days before the newest saved match, or DEFAULT_PRO_SINCE."""
+    if since:
+        return to_unix(since)
+    if path.exists():
+        return int(pd.read_parquet(path, columns=["start_time"])["start_time"].max()) - 3 * 86400
+    return to_unix(DEFAULT_PRO_SINCE)
+
+
+def collect_timelines(api: OpenDota, since: str | None = None) -> None:
+    """Gold/XP lead per minute + towers, barracks, Roshan, first blood -> pro_timelines.parquet."""
+    start = _continue_from(TIMELINES_PATH, since)
+    print(f"fetching pro match timelines since {pd.to_datetime(start, unit='s'):%Y-%m-%d}")
+    total = 0
+    for rows in _explorer_pages(api, TIMELINE_SQL, start, page_rows=5000):
+        df = pd.DataFrame(rows)
+        df["events"] = df["events"].fillna("")
+        total = save_matches(df, TIMELINES_PATH)
+        print(f"  +{len(df)} timelines (oldest {pd.to_datetime(df.start_time.min(), unit='s'):%Y-%m-%d}), file has {total}")
+    print(f"pro timelines saved: {total} -> {TIMELINES_PATH}")
+
+
 def collect_teams_and_leagues(api: OpenDota) -> None:
     teams = pd.DataFrame(api.explorer("SELECT team_id, name, tag FROM teams"))
     teams.to_parquet(TEAMS_PATH, index=False)
@@ -134,18 +175,14 @@ def collect_pro(api: OpenDota, since: str | None = None) -> None:
         print(f"  +{len(wide)} matches (oldest {pd.to_datetime(wide.start_time.min(), unit='s'):%Y-%m-%d}), file has {total}")
     print(f"pro matches saved: {total} -> {SOURCES['pro']}")
     collect_drafts(api, since)
+    collect_timelines(api, since)
     collect_teams_and_leagues(api)
 
 
 def collect_drafts(api: OpenDota, since: str | None = None) -> None:
     """Pick/ban order of pro matches (one row per action) -> data/raw/pro_drafts.parquet."""
     path = DRAFTS_PATH
-    if since:
-        start = to_unix(since)
-    elif path.exists():
-        start = int(pd.read_parquet(path, columns=["start_time"])["start_time"].max()) - 3 * 86400
-    else:
-        start = to_unix(DEFAULT_PRO_SINCE)
+    start = _continue_from(path, since)
     print(f"fetching pro drafts since {pd.to_datetime(start, unit='s'):%Y-%m-%d}")
     total = 0
     for rows in _explorer_pages(api, DRAFT_SQL, start):
@@ -182,9 +219,13 @@ def _public_batch_to_rows(batch: list[dict]) -> list[dict]:
     return rows
 
 
-def collect_public(api: OpenDota, calls: int, min_rank: int | None, save_every: int = 50) -> None:
-    """Page backwards through /publicMatches. Each call returns up to 100 matches."""
-    cursor, rows, total = None, [], 0
+def collect_public(
+    api: OpenDota, calls: int, min_rank: int | None, save_every: int = 50, stop_at_id: int | None = None, min_quota: int = 0
+) -> int:
+    """Page backwards through /publicMatches, newest first. Each call returns up to 100 matches.
+    Stops early at match `stop_at_id` (already saved) or when fewer than `min_quota` calls are
+    left today. Returns the number of API calls made."""
+    cursor, rows, total, made = None, [], 0, 0
 
     def flush():
         nonlocal rows, total
@@ -197,19 +238,28 @@ def collect_public(api: OpenDota, calls: int, min_rank: int | None, save_every: 
 
     try:
         for i in range(1, calls + 1):
+            if api.remaining_day is not None and api.remaining_day < min_quota:
+                print(f"stopping: keeping the last {min_quota} OpenDota calls of today for other jobs")
+                break
             batch = api.public_matches(less_than_match_id=cursor, min_rank=min_rank)
+            made += 1
             if not batch:
                 break
             cursor = min(m["match_id"] for m in batch)
+            if stop_at_id is not None:
+                batch = [m for m in batch if m["match_id"] > stop_at_id]
             rows.extend(_public_batch_to_rows(batch))
             if i % save_every == 0:
                 flush()
                 print(f"  call {i}/{calls}: file has {total} matches, quota left today: {api.remaining_day}")
+            if stop_at_id is not None and cursor <= stop_at_id:
+                break  # reached matches we already have
     except (QuotaExhausted, KeyboardInterrupt) as e:
         print(f"stopping early: {e or 'interrupted'}")
     finally:
         flush()
     print(f"public matches saved: {total} -> {SOURCES['public']}")
+    return made
 
 
 def main(argv=None):
@@ -218,6 +268,8 @@ def main(argv=None):
     sub.add_parser("heroes", help="hero list + patch dates")
     drafts = sub.add_parser("drafts", help="pick/ban order of pro matches (also done by 'pro')")
     drafts.add_argument("--since", help="YYYY-MM-DD (default: continue, or 2023-01-01)")
+    timelines = sub.add_parser("timelines", help="per-minute gold/XP + events of pro matches (also done by 'pro')")
+    timelines.add_argument("--since", help="YYYY-MM-DD (default: continue, or 2023-01-01)")
     pro = sub.add_parser("pro", help="pro matches via explorer SQL")
     pro.add_argument("--since", help="YYYY-MM-DD (default: continue from the newest saved match, or 2023-01-01)")
     pub = sub.add_parser("public", help="public ranked matches")
@@ -233,6 +285,8 @@ def main(argv=None):
         collect_pro(api, args.since)
     elif args.cmd == "drafts":
         collect_drafts(api, args.since)
+    elif args.cmd == "timelines":
+        collect_timelines(api, args.since)
     else:
         if not PATCHES_PATH.exists():
             collect_heroes(api)

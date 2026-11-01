@@ -10,10 +10,9 @@ from predictor.bot.app import all_commands, help_text, start_text
 from predictor.bot.auth import Auth
 from predictor.bot.config import load_config
 from predictor.bot.registry import MODELS
-from predictor.counterpick import CounterModel
 from predictor.counterpick import bot as cp_bot
 
-from test_counterpick import HEROES, synthetic_matches
+from test_counterpick import make_stats
 
 TELEGRAM_TAGS = {"b", "i", "code", "pre"}
 
@@ -59,10 +58,9 @@ def run(handler, args):
 
 @pytest.fixture
 def model(monkeypatch):
-    R, D, y = synthetic_matches(5000)
-    m = CounterModel.fit(R, D, y, HEROES)
-    monkeypatch.setattr(cp_bot, "_model", lambda: m)
-    return m
+    stats = make_stats(5000)
+    monkeypatch.setattr(cp_bot, "_stats", lambda: stats)
+    return stats
 
 
 def test_config_parses_env(tmp_path, monkeypatch):
@@ -120,5 +118,5 @@ def test_counters_and_hero(model):
 
 
 def test_no_model_message(monkeypatch):
-    monkeypatch.setattr(cp_bot, "_model", lambda: None)
+    monkeypatch.setattr(cp_bot, "_stats", lambda: None)
     assert "/train counterpick" in run(cp_bot.pick, ["pa"])[0]

@@ -1,5 +1,5 @@
-"""Model 1: hero counter-picker for public (non-pro) games."""
+"""Model 1: hero counter-picker for public (non-pro) games: plain statistics, no training."""
 
-from .model import CounterModel, model_path
+from .stats import Counts, MatchupStats
 
-__all__ = ["CounterModel", "model_path"]
+__all__ = ["Counts", "MatchupStats"]

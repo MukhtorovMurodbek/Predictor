@@ -71,5 +71,9 @@ class OpenDota:
     def public_matches(self, less_than_match_id: int | None = None, min_rank: int | None = None):
         return self.get("publicMatches", less_than_match_id=less_than_match_id, min_rank=min_rank)
 
+    def live(self) -> list[dict]:
+        """Top ~100 games being played right now (incl. pro league games)."""
+        return self.get("live")
+
     def match(self, match_id: int) -> dict:
         return self.get(f"matches/{match_id}")

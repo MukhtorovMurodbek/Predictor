@@ -9,10 +9,12 @@ A model's bot module provides:
     COMMANDS     [(command, handler, menu description), ...]
     status()     one-line HTML status
     train_model() -> str, evaluate_model() -> str   (blocking; run in a thread)
+    background() (optional)  async loop the bot starts at launch, e.g. hourly data updates
 """
 
 from ..counterpick import bot as counterpick_bot
 from ..draft import bot as draft_bot
+from ..live import bot as live_bot
 from ..pro import bot as pro_bot
 
-MODELS = {m.NAME: m for m in [counterpick_bot, pro_bot, draft_bot]}
+MODELS = {m.NAME: m for m in [counterpick_bot, pro_bot, draft_bot, live_bot]}
