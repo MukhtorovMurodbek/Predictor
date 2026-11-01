@@ -330,7 +330,8 @@ matchups measured on odd days and on even days agree at r = 0.81.
 - The English part is very doable: a language model that understands the question, calls
   our models as tools and explains the answer with the heroes' ability texts.
 
-**Plan** (starts once we pick Groq or a local model):
+**Plan** (steps 1 and 2 built 2026-11-02 in `general/ask.py`, `llm.py`, `bot.py`; they switch on once
+`groq_api` or `ollama_model` is in `.env`, see [BOT.md](BOT.md)):
 1. `/ask` in plain English → the language model picks the tool and arguments (counter-pickers,
    pro predictor, draft, live, tournament) → the bot runs it → the model writes the answer
    using those numbers.
