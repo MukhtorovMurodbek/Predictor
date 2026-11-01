@@ -20,6 +20,7 @@ PATCHES_PATH = DATA_DIR / "patches.json"
 TEAMS_PATH = DATA_DIR / "teams.parquet"
 LEAGUES_PATH = DATA_DIR / "leagues.parquet"
 PLAYERS_PATH = DATA_DIR / "players.parquet"
+DRAFTS_PATH = RAW_DIR / "pro_drafts.parquet"
 SOURCES = {"pro": RAW_DIR / "pro_matches.parquet", "public": RAW_DIR / "public_matches.parquet"}
 
 

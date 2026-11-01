@@ -14,7 +14,7 @@ import pandas as pd
 
 from .. import DATA_DIR, RAW_DIR
 from . import (
-    D_COLS, HEROES_PATH, LEAGUES_PATH, PATCHES_PATH, PLAYER_COLS, PLAYERS_PATH, R_COLS, SOURCES, TEAMS_PATH,
+    D_COLS, DRAFTS_PATH, HEROES_PATH, LEAGUES_PATH, PATCHES_PATH, PLAYER_COLS, PLAYERS_PATH, R_COLS, SOURCES, TEAMS_PATH,
     patch_for_times, to_unix,
 )
 from .opendota import OpenDota, QuotaExhausted
@@ -37,6 +37,15 @@ LIMIT {limit}
 """
 PRO_META = ["start_time", "duration", "radiant_win", "leagueid", "tier", "radiant_team_id", "dire_team_id", "patch"]
 DEFAULT_PRO_SINCE = "2023-01-01"  # older history warms up team and player ratings
+
+DRAFT_SQL = """
+SELECT pb.match_id, m.start_time, pb.ord, pb.is_pick, pb.team, pb.hero_id
+FROM picks_bans pb
+JOIN matches m USING (match_id)
+WHERE m.start_time >= {since} AND pb.match_id < {cursor}
+ORDER BY pb.match_id DESC, pb.ord
+LIMIT {limit}
+"""
 
 
 def save_matches(df: pd.DataFrame, path: Path) -> int:
@@ -95,28 +104,59 @@ def _pro_since(since: str | None) -> int:
     return to_unix(DEFAULT_PRO_SINCE)
 
 
-def collect_pro(api: OpenDota, since: str | None = None, page_rows: int = 50_000) -> None:
-    """Pull pro matches via explorer SQL, newest first, in pages. Without `since` it only
-    fetches matches newer than the ones already saved."""
-    cursor, total, start = 10**12, 0, _pro_since(since)
-    print(f"fetching pro matches since {pd.to_datetime(start, unit='s'):%Y-%m-%d}")
+def _explorer_pages(api: OpenDota, sql: str, since: int, page_rows: int = 50_000):
+    """Yield pages of rows (several rows per match), newest matches first, never splitting a
+    match across pages. `sql` must take {since}, {cursor} and {limit}."""
+    cursor = 10**12
     while True:
-        rows = api.explorer(PRO_SQL.format(since=start, cursor=cursor, limit=page_rows))
+        rows = api.explorer(sql.format(since=since, cursor=cursor, limit=page_rows))
         if not rows:
-            break
+            return
         full_page = len(rows) == page_rows
         if full_page:
             # The oldest match on a full page may be cut off; fetch it again on the next page.
             oldest = min(r["match_id"] for r in rows)
             rows = [r for r in rows if r["match_id"] != oldest]
             cursor = oldest + 1
+        yield rows
+        if not full_page:
+            return
+
+
+def collect_pro(api: OpenDota, since: str | None = None) -> None:
+    """Pull pro matches via explorer SQL, plus their drafts and team/league/player names.
+    Without `since` it only fetches matches newer than the ones already saved."""
+    start, total = _pro_since(since), 0
+    print(f"fetching pro matches since {pd.to_datetime(start, unit='s'):%Y-%m-%d}")
+    for rows in _explorer_pages(api, PRO_SQL, start):
         wide = _pro_rows_to_wide(rows)
         total = save_matches(wide, SOURCES["pro"])
         print(f"  +{len(wide)} matches (oldest {pd.to_datetime(wide.start_time.min(), unit='s'):%Y-%m-%d}), file has {total}")
-        if not full_page:
-            break
     print(f"pro matches saved: {total} -> {SOURCES['pro']}")
+    collect_drafts(api, since)
     collect_teams_and_leagues(api)
+
+
+def collect_drafts(api: OpenDota, since: str | None = None) -> None:
+    """Pick/ban order of pro matches (one row per action) -> data/raw/pro_drafts.parquet."""
+    path = DRAFTS_PATH
+    if since:
+        start = to_unix(since)
+    elif path.exists():
+        start = int(pd.read_parquet(path, columns=["start_time"])["start_time"].max()) - 3 * 86400
+    else:
+        start = to_unix(DEFAULT_PRO_SINCE)
+    print(f"fetching pro drafts since {pd.to_datetime(start, unit='s'):%Y-%m-%d}")
+    total = 0
+    for rows in _explorer_pages(api, DRAFT_SQL, start):
+        df = pd.DataFrame(rows).astype({"ord": "int8", "team": "int8", "hero_id": "int16"})
+        if path.exists():
+            df = pd.concat([pd.read_parquet(path), df], ignore_index=True)
+        df = df.drop_duplicates(["match_id", "ord"], keep="last").sort_values(["match_id", "ord"], ignore_index=True)
+        df.to_parquet(path, index=False)
+        total = df["match_id"].nunique()
+        print(f"  drafts file has {total} matches")
+    print(f"pro drafts saved: {total} matches -> {path}")
 
 
 def _public_batch_to_rows(batch: list[dict]) -> list[dict]:
@@ -176,6 +216,8 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Collect Dota 2 match data from OpenDota")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("heroes", help="hero list + patch dates")
+    drafts = sub.add_parser("drafts", help="pick/ban order of pro matches (also done by 'pro')")
+    drafts.add_argument("--since", help="YYYY-MM-DD (default: continue, or 2023-01-01)")
     pro = sub.add_parser("pro", help="pro matches via explorer SQL")
     pro.add_argument("--since", help="YYYY-MM-DD (default: continue from the newest saved match, or 2023-01-01)")
     pub = sub.add_parser("public", help="public ranked matches")
@@ -189,6 +231,8 @@ def main(argv=None):
         collect_heroes(api)
     elif args.cmd == "pro":
         collect_pro(api, args.since)
+    elif args.cmd == "drafts":
+        collect_drafts(api, args.since)
     else:
         if not PATCHES_PATH.exists():
             collect_heroes(api)

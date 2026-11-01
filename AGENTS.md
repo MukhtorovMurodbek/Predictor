@@ -9,9 +9,10 @@ Dota 2 models for a small team of students, served through one private Telegram 
 
 | Model | Folder | Data | Owner |
 |---|---|---|---|
-| 1. Counter-picker | `src/predictor/counterpick/` | **public** ranked games | Asilbek (+ Codex), also a website |
+| 1. Counter-picker | `src/predictor/counterpick/` | **public** games; moving to last-3-months statistics (STRATZ) | Asilbek (+ Codex), also a website |
 | 2. Pro match predictor | `src/predictor/pro/` | **pro matches only** | Murodbek (+ Claude) |
-| 3–6. Next-pick, live, tournament, universal | not started | pro | see `docs/PLAN.md` |
+| 3. Pro draft predictor (next pick/ban) | `src/predictor/draft/` | **pro drafts only** | Murodbek (+ Claude) |
+| 4–6. Live, tournament, universal | not started | pro | see `docs/PLAN.md` |
 
 Status lives in `PROGRESS.md`. The plan lives in `docs/PLAN.md`.
 
@@ -57,6 +58,7 @@ src/predictor/
   counterpick/     model 1: model.py, train.py, evaluate.py, recommend.py (CLI), bot.py
   pro/             model 2: features.py (ProState), dataset.py, model.py (ProModel),
                    train.py, evaluate.py, bot.py
+  draft/           model 3: features.py (DraftState), model.py (DraftModel, replay), train.py, bot.py
   bot/             Telegram bot: app.py, auth.py, admin.py (/collect /train /evaluate),
                    registry.py (the list of hosted models), config.py (.env)
 tests/             pytest

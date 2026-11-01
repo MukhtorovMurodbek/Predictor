@@ -19,7 +19,7 @@ finally one **universal model** that does everything.
 |---|---|---|---|---|
 | 1 | Counter-picker | public ranked games | ✅ live in the bot | `/counterpick` `/pick` `/counters` `/hero` |
 | 2 | Pro match predictor | pro matches only | ✅ live in the bot | `/pro` `/predict` `/team` `/top` |
-| 3 | Pro next-pick predictor | pro drafts | ⬜ | — |
+| 3 | Pro draft predictor (next pick/ban) | pro drafts only | ✅ live in the bot | `/draft` `/next` |
 | 4 | Live in-game predictor | pro match timelines | ⬜ | — |
 | 5 | Tournament (TI) predictor | pro results | ⬜ | — |
 | 6 | Universal model | everything | ⬜ last | — |
@@ -65,6 +65,9 @@ python -m predictor.counterpick.recommend --counters "Phantom Assassin"
 python -m predictor.pro.train                        # ~2 min, prints its accuracy report
 python -m predictor.pro.evaluate
 
+# model 3: pro draft predictor
+python -m predictor.draft.train                      # ~4 min, prints its top-5 accuracy
+
 # the bot (host only, see docs/BOT.md)
 python -m predictor.bot
 ```
@@ -77,6 +80,7 @@ src/predictor/
   counterpick/     model 1: model.py, train.py, evaluate.py, recommend.py (CLI), bot.py (bot commands)
   bot/             Telegram bot: app.py, auth.py (allowed users), admin.py (/collect /train), registry.py (hosted models)
   pro/             model 2: features.py (ratings, form, draft), model.py, train.py, evaluate.py, bot.py
+  draft/           model 3: features.py (draft habits), model.py, train.py, bot.py
   ...              next models follow the same pattern
 tests/             pytest tests, run automatically on GitHub for every push
 scripts/           run_bot.bat: double-click to start the bot on Windows

@@ -12,6 +12,7 @@ A model's bot module provides:
 """
 
 from ..counterpick import bot as counterpick_bot
+from ..draft import bot as draft_bot
 from ..pro import bot as pro_bot
 
-MODELS = {m.NAME: m for m in [counterpick_bot, pro_bot]}
+MODELS = {m.NAME: m for m in [counterpick_bot, pro_bot, draft_bot]}

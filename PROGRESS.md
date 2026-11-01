@@ -12,7 +12,8 @@ _Last updated: 2026-11-01_
   menu with one intro command per model → [docs/BOT.md](docs/BOT.md)
 
 ## 1. Counter-picker (public games) 👤 Asilbek (Codex + website)
-- ✅ Data: 26 k public Divine games
+- 🔨 New direction: plain statistics over the last 3 months (STRATZ API, needs a token)
+- ✅ Data: 44 k public Divine games
 - ✅ Model: counter + synergy tables, beats the hero-only baseline (56.5% vs 56.0%)
 - ✅ Hosted in the bot: `/counterpick` `/pick` `/counters` `/hero`
 - ⬜ 200 k+ games (daily `/collect public 2500`)
@@ -25,12 +26,20 @@ _Last updated: 2026-11-01_
 - ✅ Tested on newer matches: **66% right on tier 1–2 matches**, 90% right when it says 80%+
 - ✅ Hosted in the bot: `/pro` `/predict` `/team` `/top`
 - ⬜ Tuning (Elo settings, patch meta, stand-ins)
+- ⬜ Live in-game version (phase 4)
 
-## 3. Pro next-pick predictor
-- ⬜ Not started
+## 3. Pro draft predictor (next pick / ban) 👤 Murodbek + Claude
+- ✅ Data: 105,779 pro drafts since 2023 with pick/ban order
+- ✅ Model: meta, team habits, player comfort, hero combos → most likely next hero
+- ✅ Tested: real hero in its top 5 for 24% of picks / 29% of bans (meta baseline: 16%)
+- ✅ Hosted in the bot: `/draft` `/next`
+
+## Extra: talk to the bot in plain language
+- ✅ Evaluated: practical with a free cloud model (Groq). Needs a free API key
+- ⬜ Build it (after the key is in `.env`)
 
 ## 4. Live in-game predictor
-- ⬜ Not started
+- ⬜ Next
 
 ## 5. Tournament (TI) predictor
 - ⬜ Not started

@@ -124,7 +124,7 @@ def build_app(config: BotConfig) -> Application:
 
     async def post_init(app: Application) -> None:
         await app.bot.set_my_commands([BotCommand(name, desc) for name, _, desc in commands])
-        await app.bot.set_my_short_description(f"{BOT_NAME}: Dota 2 counter-picks and pro match predictions")
+        await app.bot.set_my_short_description(f"{BOT_NAME}: Dota 2 counter-picks, pro match and pro draft predictions")
         me = await app.bot.get_me()
         if config.username and me.username.lower() != config.username.lower():
             log.warning("bot_username in .env is %s but the token belongs to @%s", config.username, me.username)

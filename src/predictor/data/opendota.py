@@ -49,7 +49,15 @@ class OpenDota:
 
     def explorer(self, sql: str) -> list[dict]:
         """Run SQL against OpenDota's pro-match database."""
-        data = self.get("explorer", sql=sql)
+        for attempt in range(3):
+            try:
+                data = self.get("explorer", sql=sql)
+                break
+            except requests.HTTPError as e:
+                # Big queries sometimes fail with a 400 once (server-side timeout), then work.
+                if e.response is None or e.response.status_code != 400 or attempt == 2:
+                    raise
+                time.sleep(10)
         if data.get("err"):
             raise RuntimeError(f"explorer error: {data['err']}")
         return data["rows"]

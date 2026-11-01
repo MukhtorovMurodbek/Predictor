@@ -17,6 +17,7 @@ import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
 
 from .. import MODELS_DIR
+from ..data.teams import find_team
 from .features import DRAFT_FEATURES, PREGAME_FEATURES, ProState
 
 MODEL_PATH = MODELS_DIR / "pro.pkl"
@@ -64,29 +65,8 @@ class ProModel:
 
     def find_team(self, query: str) -> int:
         """Team id for a name or tag like 'spirit', 'Team Liquid', 'GG'. Raises ValueError."""
-        q = query.strip().lower()
-        if not q:
-            raise ValueError("empty team name")
-        recent = {t: len(self.state.team_results[t]) for t in self.active_teams(365)}
-
-        def score(team_id):
-            name, tag = (s.lower() for s in self.team_names.get(team_id, ("", "")))
-            short = name.removeprefix("team ").strip()
-            if q in (name, tag, short):
-                return 3
-            if any(w.startswith(q) for w in name.split()) or name.startswith(q):
-                return 2
-            return 1 if q in name else 0
-
-        scored = [(score(t), n, t) for t, n in recent.items()]
-        best = max((s for s, _, _ in scored), default=0)
-        if best == 0:
-            raise ValueError(f"no active team matches {query.strip()!r}")
-        cands = sorted([(n, t) for s, n, t in scored if s == best], reverse=True)
-        if len(cands) == 1 or cands[0][0] >= 2 * cands[1][0]:
-            return cands[0][1]
-        options = ", ".join(self.team_name(t) for _, t in cands[:6])
-        raise ValueError(f"{query.strip()!r} could be: {options}. Be more specific.")
+        activity = {t: len(self.state.team_results[t]) for t in self.active_teams(365)}
+        return find_team(query, self.team_names, activity)
 
     def roster(self, team_id: int) -> tuple[int, ...]:
         return self.state.team_roster[team_id][1]

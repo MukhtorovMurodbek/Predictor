@@ -89,7 +89,21 @@ pair). So: **learn counters from high-rank public games (volume), then adjust fo
 
 Each phase ends with something that works and that we can demo. Do them in order.
 
-### Phase 1 — Counter-picker (public games) ✅ hosted
+### Phase 1 — Counter-picker (public games) ✅ hosted · 👤 Asilbek
+
+**Direction change (2026-11-01, Asilbek):** turn the counter-picker into **plain statistics
+over the last 3 months** (matchup win rates, a "dynamic script"), not a trained model. The
+best source for that is the **STRATZ API**: it already aggregates nearly all public matches
+by hero pair and rank, so no need to download matches ourselves. It needs a free token
+(stratz.com/api, log in with Steam) → put it in `.env` as `stratz_token`.
+
+How many games is enough? A matchup win rate from *n* games is accurate to about ±1/√n
+(95%): 1,000 games → ±3.1 points, 10,000 → ±1.0, 100,000 → ±0.3. Counter effects are usually
+1–5 points, so **1k is too noisy, 10k is OK, 100k+ is great**. From match ids, Dota plays
+~1.45 M matches/day; Axe vs Phantom Lancer appears in ~0.6% of games, so roughly
+100k–250k Axe-vs-PL games per month exist. A STRATZ number of ~1k is probably filtered
+(one rank, one position or a few days).
+
 - [x] Rate-limited OpenDota client
 - [x] Collectors: pro matches (explorer SQL) + public high-rank matches
 - [x] Counter & synergy matrices with Bayesian smoothing (`predictor.counterpick`)
@@ -163,12 +177,30 @@ Next ideas: tune the Elo settings, add patch-specific hero meta, model best-of s
 and handle roster changes better (stand-ins). Most of the gain is in team/player strength,
 not heroes. That's expected in pro play.
 
-### Phase 3 — Pro draft assistant (week 3–4)
-- Data: pro `picks_bans` **with order** (explorer `picks_bans` table)
-- **Next-pick / next-ban prediction**: "what will Team X pick now?" Use the current draft
-  state + the team's recent hero pool + player signature heroes. Top-5 accuracy is the
-  metric.
-- Live draft view: after each pick, show win% and the likely next picks
+### Phase 3 — Pro draft predictor (next pick / ban) ✅ hosted
+- [x] Data: pick/ban order of 105,779 pro drafts since 2023 (`collect pro` fetches them too)
+- [x] Valve changed the Captains Mode order twice since 2023: every draft uses its own order,
+      and the bot uses the newest one
+- [x] Features (`draft/features.py`): hero pick/ban rate in the pro meta, how often it's a
+      team's n-th pick/ban, both teams' pick/ban habits, bans made against each team, players'
+      hero comfort, heroes usually picked together with the ones already picked, matchups
+      vs picked heroes
+- [x] Model: gradient boosting scores every free hero at each step
+- [x] Hosted: `/draft` (intro + draft order) and `/next team A vs team B: heroes so far`
+
+**Results (2026-11-01)**, 2,497 newer drafts, every free hero ranked at all 24 steps:
+
+| | top-1 | top-5 | top-10 |
+|---|---|---|---|
+| model, picks | 6.8% | **24.3%** | 38.4% |
+| model, bans | 8.9% | **29.2%** | 43.9% |
+| most popular hero in the meta, picks | 4.6% | 15.6% | 25.5% |
+| most popular hero in the meta, bans | 3.8% | 16.0% | 26.9% |
+
+(Random guessing would get ~4% top-5.) Pro drafts are hard to predict on purpose.
+
+Next ideas: hero roles/positions, the team's last few drafts (strategies repeat within an
+event), a "live draft" view that also shows win % from model 2 after each pick.
 
 ### Phase 4 — Live in-game prediction (month 2)
 - Dataset: `/api/matches/{id}` for pro matches → per-minute gold/XP diff, kills, towers, Roshan
@@ -187,6 +219,22 @@ not heroes. That's expected in pro play.
 - **Backtest on past TIs (2023, 2024, 2025, 2026)**: freeze data at the tournament start
   date and score our predictions
 - Compare with betting odds as a reality check
+
+### Extra — Talk to the bot in plain language (evaluated 2026-11-01: ✅ practical)
+Goal: write "who wins spirit or liquid?" or "спирит против ликвид кто победит" and the
+bot turns it into `/predict spirit vs liquid`. It always shows the command it understood
+("🤖 I read this as: /predict spirit vs liquid") before the answer, so mistakes are obvious.
+
+| Option | Verdict |
+|---|---|
+| **Free cloud model with tool calling** (Groq free plan: no credit card, ~1,000 requests/day on its open models; Gemini free tier: limits have changed often, sometimes only ~20–250/day) | ✅ **Recommended.** Handles English, Russian and Uzbek mixed together. Nothing to train. 4 users are far below the limits. Needs an API key in `.env` |
+| Local model, no training (e.g. a 1.5–3B instruct model via Ollama, JSON output) | ⚠️ Fallback. Fits in 4 GB of GPU memory and works offline, but it's weak at Uzbek and slang, and it's a big download |
+| Fine-tune a small local model (T5 / 0.5B with LoRA on synthetic sentence→command pairs) | ❌ Not worth it now. Lots of work (training data in three languages, hero/team aliases) and still worse than a cloud model |
+| Keyword rules only | ⚠️ Cheap, but brittle. Good as the first try before calling the model |
+
+Plan: rules first, then the cloud model, then show the translation, then run the command.
+The model only *chooses a command and fills in its arguments*; the normal command code
+checks everything. Needs: a Groq API key (console.groq.com, free) in `.env` as `groq_api`.
 
 ### Phase 6 — Universal model (last)
 - One model with shared hero/team embeddings and several output heads: counter-pick scores,
