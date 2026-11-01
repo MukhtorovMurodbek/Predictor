@@ -12,6 +12,10 @@ finally one **universal model** that does everything.
 - **[PROGRESS.md](PROGRESS.md)**: short checklist of what's done
 - **[CONTRIBUTING.md](CONTRIBUTING.md)**: how we work together, how to add a model
 - **[AGENTS.md](AGENTS.md)**: rules for AI coding agents (Codex, Claude, ...)
+- **[docs/COUNTERPICK-WEB.md](docs/COUNTERPICK-WEB.md)**: run the new statistics-based counter-picker website
+
+The website is Asilbek's statistics-based counter-picker (no training). The bot hosts both
+counter-pickers: `/counterpick` (90-day matchup edges) and `/asil` (Asilbek's ranking).
 
 ## Models
 

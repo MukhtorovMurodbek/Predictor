@@ -25,9 +25,10 @@ _Last updated: 2026-11-01 (evening)_
 - ✅ Hosted in the bot: `/counterpick` `/pick` `/counters` `/hero`
 - ✅ Phantom Lancer check: 8 of our top 10 counters are in Dotabuff's top 14
 - 🔨 Data growing: 79 k games on day 1, up to ~200 k/day
-- ⬜ STRATZ token (needs an account with 100+ public games: Asilbek?)
-- ⬜ Rank brackets, personal hero pool, roles
-- ⬜ Website
+- ✅ Asilbek's website version: average win rate vs the enemies, rank and patch filters → [setup](docs/COUNTERPICK-WEB.md)
+- ✅ Asilbek's version also in the bot: `/asil` `/apick` (same data, his ranking rules)
+- 🔨 Asilbek: STRATZ connection test on branch `feat/stratz-connection-latest` (not merged yet)
+- ⬜ Rank brackets in the 90-day tables, personal hero pool, roles
 
 ## 2. Pro match predictor (pro matches only) 👤 Murodbek + Claude
 - ✅ Data: 106,900 pro matches since 2023, with players, teams and league tiers
