@@ -1,24 +1,30 @@
 """Asilbek's counter-picker (the website) in Python, so the bot can host it.
 
-Two parts, both following Asilbek's code exactly:
+Following Asilbek's code exactly:
   pair_counts()     the same numbers as build_snapshot() in statistics.py (directional wins and
-                    games per hero pair, same filters and data checks), but vectorised, so a
-                    week of games (~1M) takes seconds instead of minutes
+                    games per hero pair, same filters and data checks), but vectorised
+  window_counts()   the same numbers again, but from the daily tables of the last N days
+                    (every public game OpenDota lists, ~550k a day), which /apick and the
+                    website use; rank filters work in whole medals
+  snapshot()        window_counts() in the website's /api/sample format (build_snapshot's)
   rank_candidates() a line-by-line port of rankCandidates() in web/static/engine.js
 
 If the website's rules change, change them here too (tests/test_counterpick_engine.py compares
-pair_counts() with build_snapshot()).
+pair_counts() and window_counts() with build_snapshot()).
 """
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 
 import numpy as np
 import pandas as pd
 
 from ..data import D_COLS, R_COLS
-from .stats import N_HEROES, _pair_counts
+from . import stats
+from .stats import N_HEROES, DayTable, _pair_counts, valid_rows
 
 MIN_MATCHES_PER_OPPONENT = 20  # engine.js: below this a candidate is "limited confidence"
+APICK_DAYS = 30  # Asilbek: about a month of games (he asked for "from October 1" on November 1)
 
 
 @dataclass
@@ -28,26 +34,15 @@ class PairCounts:
     eligible: int  # games that passed the filters
     oldest: int | None  # start_time range of those games
     newest: int | None
-
-
-def _valid(df: pd.DataFrame) -> pd.Series:
-    """Rows build_snapshot() would count: positive match id, 10 different positive hero ids,
-    a True/False result."""
-    heroes = df[R_COLS + D_COLS].apply(pd.to_numeric, errors="coerce")
-    ints = heroes.notna().all(axis=1) & (heroes.fillna(0) % 1 == 0).all(axis=1) & (heroes.fillna(0) > 0).all(axis=1)
-    distinct = heroes.nunique(axis=1) == 10
-    mid = pd.to_numeric(df["match_id"], errors="coerce")
-    good_id = mid.notna() & (mid > 0) & (mid.fillna(0) % 1 == 0)
-    result_ok = df["radiant_win"].map(lambda v: isinstance(v, (bool, np.bool_)))
-    return ints & distinct & good_id & result_ok
+    scanned: int = 0  # games looked at before the rank and patch filters
 
 
 def pair_counts(matches: pd.DataFrame, rank_min: int | None = None, rank_max: int | None = None, patch: str | None = None) -> PairCounts:
     """Same counts as statistics.build_snapshot(matches, ..., rank_min, rank_max, patch)."""
-    empty = PairCounts(np.zeros((N_HEROES, N_HEROES)), np.zeros((N_HEROES, N_HEROES)), 0, None, None)
+    empty = PairCounts(np.zeros((N_HEROES, N_HEROES)), np.zeros((N_HEROES, N_HEROES)), 0, None, None, len(matches))
     if matches.empty:
         return empty
-    df = matches[_valid(matches)]
+    df = matches[valid_rows(matches)]
     df = df.drop_duplicates("match_id", keep="first")  # build_snapshot counts a match id once
     if rank_min is not None or rank_max is not None:
         rank = pd.to_numeric(df["avg_rank_tier"], errors="coerce")
@@ -74,7 +69,70 @@ def pair_counts(matches: pd.DataFrame, rank_min: int | None = None, rank_max: in
         eligible=len(df),
         oldest=int(times.min()) if len(times) else None,
         newest=int(times.max()) if len(times) else None,
+        scanned=len(matches),
     )
+
+
+def medals_for(rank_min: int | None, rank_max: int | None) -> set[int] | None:
+    """The medals a rank range covers (None = every game, incl. unranked). The tables keep
+    medals, not single tiers, so the range must hold whole medals: 40-45 is Archon (tiers
+    41-45; tier 40 doesn't exist), 30-55 is Crusader to Legend, 80 is Immortal."""
+    if rank_min is None and rank_max is None:
+        return None
+    lo, hi = 10 if rank_min is None else rank_min, 80 if rank_max is None else rank_max
+    medals = set()
+    for m in range(1, 9):
+        first, last = (80, 80) if m == 8 else (m * 10 + 1, m * 10 + 5)  # tiers that exist
+        if lo <= first and last <= hi:
+            medals.add(m)
+        elif first <= hi and lo <= last:
+            raise ValueError("rank filters work in whole medals, e.g. 40-45 for Archon or 30-55 for Crusader to Legend")
+    return medals
+
+
+def window_counts(rank_min: int | None = None, rank_max: int | None = None, patch: str | None = None,
+                  days: int = APICK_DAYS, today: datetime | None = None) -> PairCounts:
+    """Same counts as pair_counts() over the games of the last `days` days, from the daily
+    tables (data/counterpick/YYYY-MM-DD.npz) instead of a table of games."""
+    medals = medals_for(rank_min, rank_max)
+    picked, scanned = stats.Slice.empty(), 0
+    for path in stats.daily_files(days, today):
+        table = DayTable.load(path)
+        scanned += table.n_matches
+        picked = picked + table.select(medals, patch)
+    return PairCounts(wins=picked.wins, games=picked.games, eligible=picked.n,
+                      oldest=picked.first, newest=picked.last, scanned=scanned)
+
+
+def snapshot(hero_names: dict[int, str], rank_min: int | None = None, rank_max: int | None = None,
+             patch: str | None = None, days: int = APICK_DAYS) -> dict:
+    """The website's /api/sample answer (the fields of statistics.build_snapshot) from the
+    daily tables. Raises FileNotFoundError when there are no tables yet."""
+    if not stats.daily_files(days):
+        raise FileNotFoundError("no counter-picker tables yet, run: python -m predictor.counterpick.update")
+    c = window_counts(rank_min, rank_max, patch, days)
+    pairs = np.argwhere(c.games > 0)
+    return {
+        "heroes": [{"id": int(h), "name": name} for h, name in sorted(hero_names.items())],
+        "pairwise": [{"hero_id": int(a), "enemy_id": int(b), "wins": int(c.wins[a, b]), "matches": int(c.games[a, b])}
+                     for a, b in pairs],
+        "gamesScanned": c.scanned,
+        "gamesEligible": c.eligible,
+        "oldestTimestamp": c.oldest,
+        "newestTimestamp": c.newest,
+        "rankMin": rank_min,
+        "rankMax": rank_max,
+        "patch": patch,
+        "warnings": [
+            f"Every ranked public match OpenDota lists from the last {days} days (normal modes, 10+ minutes), "
+            "counted by OpenDota's database and refreshed every hour; the newest 3-7 hours are not in yet.",
+            "Rank is the match average, not an individual player's rank.",
+        ] + ([] if c.eligible else ["No valid matches met the selected filters."])
+          + (["Patch labels come from the patch release dates."] if patch is not None else []),
+        "fetchedAt": None,
+        "aggregatedAt": datetime.now(timezone.utc).isoformat(),
+        "source": "OpenDota public matches, counted into daily tables by the bot",
+    }
 
 
 def rank_candidates(hero_names: dict[int, str], counts: PairCounts, enemies, allies=(), bans=()) -> list[dict]:

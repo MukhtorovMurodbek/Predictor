@@ -25,7 +25,7 @@ in Telegram's `/` menu.
 | `/pick pa, pudge, lion` | Best heroes to pick against those enemies |
 | `/pick pa, pudge \| cm, axe \| invoker` | Same, plus your team (after the 1st `\|`) and bans (after the 2nd) |
 | `/counters phantom assassin` | Heroes that beat this hero |
-| `/apick pa, pudge \| cm rank archon-legend` | Asilbek's counter-picker: best average win rate vs the enemies, optional rank/patch filter |
+| `/apick pa, pudge \| cm rank archon-legend` | Asilbek's counter-picker: best average win rate vs the enemies over the last 30 days; optional rank, patch and `days 7` filters |
 | `/hero cm` | A hero's win rate, best and worst matchups, best allies |
 | `/predict spirit vs liquid` | Pro match: chance to win a map, Bo3 and Bo5 |
 | `/predict spirit: pa, cm, axe, lion, invoker vs liquid: am, lina, tide, rubick, sven` | The same after the draft |
@@ -36,7 +36,7 @@ in Telegram's `/` menu.
 | `/odds spirit, falcons, liquid, ...` | Title chances for 8+ teams you list |
 | `/journal` | How the pro predictions did on new matches (predicted before the models saw them) |
 | `/status` | Which models are loaded, how much data, running jobs |
-| `/collect public 300` | Admin: download ~26 k public games (300 API calls ≈ 5 min) |
+| `/collect public 300` | Admin: download a raw sample of public games (the counter-pickers don't need it; they count every game by themselves) |
 | `/collect pro` | Admin: download new pro matches (+ team, league and player names) |
 | `/live` | Pro games being played right now, with live win % |
 | `/ingame spirit vs liquid 25 +5k towers 3-1` | Live win % from a scoreboard you type |
@@ -94,7 +94,6 @@ Get some data and a model, either from the command line or later through the bot
 
 ```bash
 .venv\Scripts\python -m predictor.data.collect heroes
-.venv\Scripts\python -m predictor.data.collect public --calls 300
 .venv\Scripts\python -m predictor.counterpick.update
 .venv\Scripts\python -m predictor.data.collect pro
 .venv\Scripts\python -m predictor.pro.train

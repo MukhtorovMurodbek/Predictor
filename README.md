@@ -22,7 +22,7 @@ counter-pickers: `/counterpick` (90-day matchup edges) and `/asil` (Asilbek's ra
 | # | Model | Trained on | Status | Bot commands |
 |---|---|---|---|---|
 | 1 | Counter-picker (statistics, no model) | public games, all ranks, last 90 days, auto-updated hourly | ✅ live in the bot | `/counterpick` `/pick` `/counters` `/hero` |
-| 1b | Asilbek's counter-picker (website + bot) | public games, last 7 days, rank/patch filters | ✅ live in the bot | `/asil` `/apick` |
+| 1b | Asilbek's counter-picker (website + bot) | public games, last 30 days, rank/patch filters | ✅ live in the bot | `/asil` `/apick` |
 | 2 | Pro match predictor | pro matches only | ✅ live in the bot | `/pro` `/predict` `/team` `/top` |
 | 3 | Pro draft predictor (next pick/ban) | pro drafts only | ✅ live in the bot | `/draft` `/next` |
 | 4 | Live in-game predictor | pro match timelines | ✅ live in the bot | `/livepro` `/live` `/ingame` |
@@ -58,10 +58,9 @@ The same things the bot does, from a terminal:
 # data (OpenDota free tier: 60 calls/min, 3,000/day per internet connection)
 python -m predictor.data.collect heroes
 python -m predictor.data.collect pro                 # since 2023 the first time, then only new matches
-python -m predictor.data.collect public --calls 500 --min-rank 70
 
 # model 1: counter-picker (statistics; the bot runs the update every hour by itself)
-python -m predictor.counterpick.update               # fetch new games + update daily tables
+python -m predictor.counterpick.update               # count new + older public games into daily tables
 python -m predictor.counterpick.recommend --enemies "pa, pudge, lion" --allies "cm"
 python -m predictor.counterpick.recommend --counters "Phantom Assassin"
 

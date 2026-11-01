@@ -3,7 +3,7 @@
 Quick status. Details are in [docs/PLAN.md](docs/PLAN.md).
 ✅ done · 🔨 in progress · ⬜ not started · 👤 owner
 
-_Last updated: 2026-11-01 (evening)_
+_Last updated: 2026-11-01 (late night)_
 
 ## Setup
 - ✅ Public GitHub repo, MIT license, automatic tests on every push
@@ -21,12 +21,13 @@ _Last updated: 2026-11-01 (evening)_
 
 ## 1. Counter-picker (public games) 👤 Asilbek (Codex + website)
 - ✅ Now plain statistics, no model: win rates per hero pair, last 90 days, like Dotabuff
-- ✅ Updates itself every hour (new games + backfill), only 7 days of raw games kept
+- ✅ Every public game OpenDota lists (~550 k a day, not a sample), counted by OpenDota's database every hour
 - ✅ Hosted in the bot: `/counterpick` `/pick` `/counters` `/hero`
-- ✅ Phantom Lancer check: 8 of our top 10 counters are in Dotabuff's top 14
-- 🔨 Data growing: 79 k games on day 1, up to ~200 k/day
+- ✅ Phantom Lancer vs Dotabuff with every game: win rates within 0.3 points, same top counters in nearly the same order (0.98) → [details](docs/VALIDATION.md)
+- 🔨 Filling the 90-day window: about a month per hour, all 90 days by the morning of 2026-11-02
 - ✅ Asilbek's website version: average win rate vs the enemies, rank and patch filters → [setup](docs/COUNTERPICK-WEB.md)
 - ✅ Asilbek's version also in the bot: `/asil` `/apick` (same data, his ranking rules)
+- ✅ `/apick` and the website now use the last 30 days, not just since Oct 31 (Asilbek's request); `days 90` for more
 - 🔨 Asilbek: STRATZ connection test on branch `feat/stratz-connection-latest` (not merged yet)
 - ⬜ Rank brackets in the 90-day tables, personal hero pool, roles
 

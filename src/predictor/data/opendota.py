@@ -15,6 +15,10 @@ class QuotaExhausted(RuntimeError):
     pass
 
 
+class ExplorerError(RuntimeError):
+    """The explorer refused a query; the message says why (e.g. "Query read timeout")."""
+
+
 class OpenDota:
     def __init__(self, api_key: str | None = None, min_interval: float = 1.05):
         self.api_key = api_key or os.environ.get("OPENDOTA_API_KEY")
@@ -47,19 +51,26 @@ class OpenDota:
             return resp.json()
         resp.raise_for_status()
 
-    def explorer(self, sql: str) -> list[dict]:
-        """Run SQL against OpenDota's pro-match database."""
-        for attempt in range(3):
+    def explorer(self, sql: str, tries: int = 3) -> list[dict]:
+        """Run SQL against OpenDota's database (pro matches, public matches, ...). The server
+        stops a query after about 15 seconds."""
+        for attempt in range(tries):
             try:
                 data = self.get("explorer", sql=sql)
                 break
             except requests.HTTPError as e:
                 # Big queries sometimes fail with a 400 once (server-side timeout), then work.
-                if e.response is None or e.response.status_code != 400 or attempt == 2:
+                if e.response is None or e.response.status_code != 400:
                     raise
+                if attempt == tries - 1:
+                    try:
+                        reason = e.response.json().get("err")
+                    except ValueError:
+                        reason = None
+                    raise ExplorerError(f"explorer error: {reason or e}") from e
                 time.sleep(10)
         if data.get("err"):
-            raise RuntimeError(f"explorer error: {data['err']}")
+            raise ExplorerError(f"explorer error: {data['err']}")
         return data["rows"]
 
     def heroes(self) -> list[dict]:

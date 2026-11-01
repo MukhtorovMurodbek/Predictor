@@ -1,7 +1,8 @@
 """Serve the counter-picker and local match statistics on loopback only.
 
 Run from the repository root: python -m web.server
-Data is collected separately using the project's OpenDota collector.
+Data: the counter-picker's daily tables (every public game OpenDota lists, last 30 days),
+filled every hour by the bot or by: python -m predictor.counterpick.update
 """
 
 import argparse
@@ -13,11 +14,11 @@ from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from predictor.counterpick.statistics import build_snapshot
-from predictor.data import HEROES_PATH, SOURCES, load_heroes, load_matches
+from predictor.counterpick import stats
+from predictor.counterpick.engine import APICK_DAYS, snapshot
+from predictor.data import HEROES_PATH, load_heroes
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
-PUBLIC_PATH = SOURCES["public"]
 _cache = OrderedDict()
 _lock = threading.Lock()
 
@@ -25,6 +26,13 @@ _lock = threading.Lock()
 def _revision(path):
     stat = path.stat()
     return stat.st_mtime_ns, stat.st_size
+
+
+def _tables_revision():
+    files = stats.daily_files(APICK_DAYS)
+    if not files:
+        raise FileNotFoundError("no counter-picker tables yet")
+    return tuple((f.name, _revision(f)) for f in files)
 
 
 def _heroes():
@@ -47,10 +55,10 @@ def _heroes():
 def _snapshot(rank_min, rank_max, patch):
     # Cache by data and hero catalogue revisions plus every filter. Only the
     # owner-maintained dataset is read; nothing is fetched on user requests.
-    key = (_revision(PUBLIC_PATH), _revision(HEROES_PATH), rank_min, rank_max, patch)
+    key = (_tables_revision(), _revision(HEROES_PATH), rank_min, rank_max, patch)
     with _lock:
         if key not in _cache:
-            _cache[key] = build_snapshot(load_matches("public"), load_heroes(), rank_min=rank_min, rank_max=rank_max, patch=patch)
+            _cache[key] = snapshot(load_heroes(), rank_min=rank_min, rank_max=rank_max, patch=patch)
             while len(_cache) > 12:
                 _cache.popitem(last=False)
         _cache.move_to_end(key)
@@ -95,7 +103,7 @@ class Handler(SimpleHTTPRequestHandler):
                 raise ValueError("Invalid patch. Use a value such as 7.41.")
             return self._json(200, _snapshot(rank_min, rank_max, patch))
         except FileNotFoundError:
-            return self._json(503, {"error": "Local data is missing. Run the project’s hero and public match collectors first."})
+            return self._json(503, {"error": "Local data is missing. Run the counter-picker update first: python -m predictor.counterpick.update"})
         except ValueError as error:
             return self._json(400, {"error": str(error)})
         except Exception:
