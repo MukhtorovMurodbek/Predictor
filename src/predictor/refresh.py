@@ -148,7 +148,7 @@ def journal_summary(days: tuple[int, ...] = (7, 30, 3650)) -> str:
 
 def main(argv=None):
     argparse.ArgumentParser(description="Download new pro matches, journal predictions, retrain").parse_args(argv)
-    print(refresh())
+    refresh()
     print(journal_summary())
 
 

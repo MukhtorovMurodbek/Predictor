@@ -81,6 +81,25 @@ All models rebuilt from matches **before** each event, then asked about every ga
 See `/tournament` in the bot or `docs/PLAN.md` (phase 5): champion ranked #1 (2023), #3
 (2024), #1 (2025), #7 (2026).
 
+## After retraining with the fixes
+
+Same kind of test as before (train on older matches, test on newer ones), current models:
+
+| Model | Before the fixes | After |
+|---|---|---|
+| Draft: real ban in top 5 | 29.2% | **34.7%** |
+| Draft: real pick in top 5 | 24.3% | **25.5%** |
+| Live: right at 0 / 10 / 20 / 30 min | 62 / 69 / 77 / 82% | **66 / 72 / 79 / 82%** |
+| Pro: map winner after the draft (tier 1–2) | 65.7% (6.9k maps) | 64.8% (13.5k maps, longer and older test window) |
+| TI backtest | #1, #3, #1, #7 | #1, #3, #1, #7 |
+
+The pro numbers use different test windows (the filtered data is smaller, so its newest 20%
+starts earlier). The fair same-window comparison is in section 3: +0.5 points. Calibration still
+holds: when the pro model says 80%+, it is right 90% of the time.
+
+Transfers in practice: Team Falcons' TI roster has broken up (Sneyking → LGD, skiter → Aurora,
+Malr1ne → Liquid, AMMAR_THE_F → Yandex). The bot now uses only the players still there.
+
 ## What this changed
 
 - League-tier filter for all pro models (section 3)

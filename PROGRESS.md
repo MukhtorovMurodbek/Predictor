@@ -32,14 +32,14 @@ _Last updated: 2026-11-01 (evening)_
 ## 2. Pro match predictor (pro matches only) 👤 Murodbek + Claude
 - ✅ Data: 106,900 pro matches since 2023, with players, teams and league tiers
 - ✅ Model: team/player ratings + form + head-to-head + draft → win %
-- ✅ Tested on newer matches: **66% right on tier 1–2 matches**, 90% right when it says 80%+
+- ✅ Tested on newer matches: **65% right on tier 1–2 matches**, 90% right when it says 80%+
 - ✅ Hosted in the bot: `/pro` `/predict` `/team` `/top`
 - ⬜ Tuning (Elo settings, patch meta, stand-ins)
 
 ## 3. Pro draft predictor (next pick / ban) 👤 Murodbek + Claude
 - ✅ Data: 105,779 pro drafts since 2023 with pick/ban order
 - ✅ Model: meta, team habits, player comfort, hero combos → most likely next hero
-- ✅ Tested: real hero in its top 5 for 24% of picks / 29% of bans (meta baseline: 16%)
+- ✅ Tested: real hero in its top 5 for 26% of picks / 35% of bans (meta baseline: 18–20%)
 - ✅ Hosted in the bot: `/draft` `/next`
 
 ## Extra: talk to the bot in plain language
@@ -49,7 +49,7 @@ _Last updated: 2026-11-01 (evening)_
 ## 4. Live in-game predictor 👤 Murodbek + Claude
 - ✅ Data: gold/XP per minute + towers, Roshan, first blood for 106,752 pro matches
 - ✅ Model: team strength + draft + scoreboard → win %
-- ✅ Tested: right 62% at the start, 69% at 10 min, 77% at 20 min, 82% at 30 min
+- ✅ Tested: right 66% at the start, 72% at 10 min, 79% at 20 min, 82% at 30 min
 - ✅ Hosted in the bot: `/livepro` `/live` `/ingame`
 
 ## 5. Tournament (TI) predictor 👤 Murodbek + Claude
