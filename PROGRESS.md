@@ -13,11 +13,12 @@ _Last updated: 2026-11-01_
 
 ## 1. Counter-picker (public games) 👤 Asilbek (Codex + website)
 - ✅ Data: 26 k public Divine games
-- ✅ Model: counter + synergy tables, beats the hero-only baseline (56.5% vs 56.0%)
-- ✅ Hosted in the bot: `/counterpick` `/pick` `/counters` `/hero`
+- ✅ Legacy trained model: counter + synergy tables, with previously reported results of 56.5% vs 56.0% for the hero-only baseline
+- ✅ Legacy model hosted in the bot: `/counterpick` `/pick` `/counters` `/hero`
 - ⬜ 200 k+ games (daily `/collect public 2500`)
-- ⬜ Rank brackets, personal hero pool, roles
-- ⬜ Website
+- 🔨 Website: statistical matchup explorer based on locally collected public games; no model training needed → [setup and limitations](docs/COUNTERPICK-WEB.md)
+- ⬜ More matchup data, validated rank and patch coverage, personal hero pool, and position-aware suggestions
+- ⬜ Decide how to bring the bot onto the website's statistical approach; it still uses the legacy trained model
 
 ## 2. Pro match predictor (pro matches only) 👤 Murodbek + Claude
 - ✅ Data: 106,900 pro matches since 2023, with players, teams and league tiers
