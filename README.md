@@ -22,6 +22,7 @@ counter-pickers: `/counterpick` (90-day matchup edges) and `/asil` (Asilbek's ra
 | # | Model | Trained on | Status | Bot commands |
 |---|---|---|---|---|
 | 1 | Counter-picker (statistics, no model) | public games, all ranks, last 90 days, auto-updated hourly | ✅ live in the bot | `/counterpick` `/pick` `/counters` `/hero` |
+| 1b | Asilbek's counter-picker (website + bot) | public games, last 7 days, rank/patch filters | ✅ live in the bot | `/asil` `/apick` |
 | 2 | Pro match predictor | pro matches only | ✅ live in the bot | `/pro` `/predict` `/team` `/top` |
 | 3 | Pro draft predictor (next pick/ban) | pro drafts only | ✅ live in the bot | `/draft` `/next` |
 | 4 | Live in-game predictor | pro match timelines | ✅ live in the bot | `/livepro` `/live` `/ingame` |

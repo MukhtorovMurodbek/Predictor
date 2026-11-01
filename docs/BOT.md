@@ -21,10 +21,11 @@ in Telegram's `/` menu.
 
 | Command | What it does |
 |---|---|
-| `/start` | Pick a model. `/counterpick`, `/pro`, `/draft`, `/livepro`, `/tournament` and `/admin` each explain their own commands. `/help` lists every command |
+| `/start` | Pick a model. `/counterpick`, `/asil`, `/pro`, `/draft`, `/livepro`, `/tournament` and `/admin` each explain their own commands. `/help` lists every command |
 | `/pick pa, pudge, lion` | Best heroes to pick against those enemies |
 | `/pick pa, pudge \| cm, axe \| invoker` | Same, plus your team (after the 1st `\|`) and bans (after the 2nd) |
 | `/counters phantom assassin` | Heroes that beat this hero |
+| `/apick pa, pudge \| cm rank archon-legend` | Asilbek's counter-picker: best average win rate vs the enemies, optional rank/patch filter |
 | `/hero cm` | A hero's win rate, best and worst matchups, best allies |
 | `/predict spirit vs liquid` | Pro match: chance to win a map, Bo3 and Bo5 |
 | `/predict spirit: pa, cm, axe, lion, invoker vs liquid: am, lina, tide, rubick, sven` | The same after the draft |

@@ -58,7 +58,8 @@ src/predictor/
   data/            shared: OpenDota client, collectors (python -m predictor.data.collect ...),
                    load_matches(), resolve_heroes() (hero names like "pa", "cm")
   counterpick/     model 1: stats.py (Counts per day, MatchupStats), update.py (hourly refresh),
-                   recommend.py (CLI), bot.py
+                   recommend.py (CLI), bot.py; Asilbek's version: statistics.py (website data),
+                   engine.py (Python port of web/static/engine.js), website_bot.py (/asil, /apick)
   pro/             model 2: features.py (ProState), dataset.py, model.py (ProModel),
                    train.py, evaluate.py, bot.py
   draft/           model 3: features.py (DraftState), model.py (DraftModel, replay), train.py, bot.py
@@ -66,6 +67,7 @@ src/predictor/
   tournament/      model 5: sim.py (Monte Carlo of a TI-style event), backtest.py, bot.py
   bot/             Telegram bot: app.py, auth.py, admin.py (/collect /train /evaluate),
                    registry.py (the list of hosted models), config.py (.env)
+web/              Asilbek's counter-picker website (python -m web.server, loopback only)
 tests/             pytest
 docs/              PLAN.md (roadmap), BOT.md (bot usage + hosting)
 ```
@@ -101,7 +103,11 @@ Bot message rules:
 
 ## For the website (Asilbek)
 
-Put it in its own top-level folder (e.g. `web/`) and import models from the package
+The website lives in `web/` and is also hosted in the bot (`/asil`, `/apick`). When you change
+its ranking rules in `web/static/engine.js`, change `src/predictor/counterpick/engine.py` the same
+way (`tests/test_counterpick_engine.py` checks the counting against `statistics.py`).
+
+Put new website code in `web/` and import models from the package
 (`from predictor.counterpick import MatchupStats`) instead of copying code. Note: the raw file
 `data/raw/public_matches.parquet` now only keeps the **last 7 days**. The 90-day numbers live in
 the daily tables `data/counterpick/*.npz` (`MatchupStats.from_daily(...)`). If the site
