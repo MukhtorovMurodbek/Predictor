@@ -1,5 +1,8 @@
 # Predictor
 
+[![tests](https://github.com/MukhtorovMurodbek/Predictor/actions/workflows/tests.yml/badge.svg)](https://github.com/MukhtorovMurodbek/Predictor/actions/workflows/tests.yml)
+[![license: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+
 Dota 2 draft & match predictor: a **hero counter-picker** first, then **win prediction**
 for drafts, live games and whole tournaments (The International).
 
@@ -69,3 +72,13 @@ src/predictor/
   evaluate.py   time-split evaluation vs baselines
 docs/PLAN.md    plan & roadmap
 ```
+
+## License & data
+
+The code is MIT-licensed, see [LICENSE](LICENSE).
+
+Match data comes from the [OpenDota API](https://docs.opendota.com/). It isn't stored in
+this repo, and each user downloads it with their own quota. If you publish a dataset or
+results built from it, credit OpenDota and follow their terms. Dota 2 and hero names are
+trademarks of Valve Corporation. This is an unofficial fan project, not affiliated with
+Valve.
