@@ -149,9 +149,18 @@ def count_block(api: OpenDota, t0: int, t1: int) -> tuple[DayTable, int]:
     return total, queries
 
 
-def add_to_day(table: DayTable, day: str) -> None:
-    path = day_path(day)
+def already_counted(t0: int, t1: int) -> bool:
+    """True if the day table already holds [t0, t1): the bot was stopped after saving the
+    table but before saving state.json, so only the cursor is behind."""
+    path = day_path(_day(t0))
+    return path.exists() and DayTable.load(path).has_block(t0, t1)
+
+
+def add_to_day(table: DayTable, t0: int, t1: int) -> None:
+    """Add the counts of [t0, t1) to its day table, recording the block in the table."""
+    path = day_path(_day(t0))
     old = DayTable.load(path) if path.exists() else DayTable.empty()
+    table.blocks = [(t0, t1)]
     (old + table).save(path)
 
 
@@ -195,8 +204,10 @@ def update(backfill_blocks: int = BACKFILL_BLOCKS, api: OpenDota | None = None, 
 
         def count(t0, t1):
             nonlocal games, queries
+            if already_counted(t0, t1):
+                return
             table, n = count_block(api, t0, t1)
-            add_to_day(table, _day(t0))
+            add_to_day(table, t0, t1)
             games, queries = games + table.n_matches, queries + n
             days.add(_day(t0))
 
