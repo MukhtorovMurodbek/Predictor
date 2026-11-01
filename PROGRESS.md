@@ -62,5 +62,6 @@ _Last updated: 2026-11-01 (late night)_
 ## 6. General predictor (was: universal model) 👤 Murodbek + Claude
 - ✅ Idea tested: counters from hero skills alone find 15% of the real top-5 counters (random: 4%), so it works, but weakly → [details](docs/PLAN.md)
 - ✅ `general/skills.py`: skill features + the test (`python -m predictor.general.skills`)
-- ⬜ Choose the language model: Groq (free, cloud) or local (Ollama, ~2.5 GB download)
-- ⬜ `/ask` in plain English → the right model, plus "why" explanations from ability texts
+- ✅ `/ask` in plain English: a language model picks the right command, the answer quotes its numbers; "why" questions read the heroes' abilities
+- 🔨 Off until we add a language model to `.env`: Groq (free, cloud) or Ollama (on the laptop, ~2.5 GB) → [setup](docs/BOT.md)
+- ⬜ Patch notes in, changed heroes out (patch-filtered stats + the skills guess)

@@ -15,8 +15,9 @@ A model's bot module provides:
 from ..counterpick import bot as counterpick_bot
 from ..counterpick import website_bot as asil_bot
 from ..draft import bot as draft_bot
+from ..general import bot as general_bot
 from ..live import bot as live_bot
 from ..pro import bot as pro_bot
 from ..tournament import bot as tournament_bot
 
-MODELS = {m.NAME: m for m in [counterpick_bot, asil_bot, pro_bot, draft_bot, live_bot, tournament_bot]}
+MODELS = {m.NAME: m for m in [counterpick_bot, asil_bot, pro_bot, draft_bot, live_bot, tournament_bot, general_bot]}

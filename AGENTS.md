@@ -65,7 +65,8 @@ src/predictor/
   draft/           model 3: features.py (DraftState), model.py (DraftModel, replay), train.py, bot.py
   live/            model 4: features.py (scoreboard), model.py (LiveModel), train.py, bot.py
   tournament/      model 5: sim.py (Monte Carlo of a TI-style event), backtest.py, bot.py
-  general/         phase 6: skills.py (hero skill features + "counters from skills alone" test)
+  general/         phase 6: ask.py (/ask: question -> a model command as a tool -> answer), llm.py
+                   (Groq/Ollama client, OpenAI-style API), bot.py, skills.py (counters from skills test)
   bot/             Telegram bot: app.py, auth.py, admin.py (/collect /train /evaluate),
                    registry.py (the list of hosted models), config.py (.env)
 web/              Asilbek's counter-picker website (python -m web.server, loopback only)

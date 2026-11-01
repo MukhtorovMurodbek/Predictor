@@ -27,7 +27,7 @@ counter-pickers: `/counterpick` (90-day matchup edges) and `/asil` (Asilbek's ra
 | 3 | Pro draft predictor (next pick/ban) | pro drafts only | ✅ live in the bot | `/draft` `/next` |
 | 4 | Live in-game predictor | pro match timelines | ✅ live in the bot | `/livepro` `/live` `/ingame` |
 | 5 | Tournament (TI) predictor | pro model + simulated TI format | ✅ live in the bot | `/tournament` `/odds` |
-| 6 | General predictor (plain English, all models; skills test done) | everything | 🔨 idea tested | — |
+| 6 | General predictor (plain English, all models) | everything | 🔨 built, needs a language model key | `/general` `/ask` |
 
 Each model is built, then hosted in the bot, before the next one starts.
 

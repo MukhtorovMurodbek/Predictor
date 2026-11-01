@@ -21,7 +21,8 @@ in Telegram's `/` menu.
 
 | Command | What it does |
 |---|---|
-| `/start` | Pick a model. `/counterpick`, `/asil`, `/pro`, `/draft`, `/livepro`, `/tournament` and `/admin` each explain their own commands. `/help` lists every command |
+| `/start` | Pick a model. `/counterpick`, `/asil`, `/pro`, `/draft`, `/livepro`, `/tournament`, `/general` and `/admin` each explain their own commands. `/help` lists every command |
+| `/ask who wins spirit vs liquid?` | Plain English: a language model picks the right command, the bot runs it, the answer quotes its numbers (needs a language model, see below) |
 | `/pick pa, pudge, lion` | Best heroes to pick against those enemies |
 | `/pick pa, pudge \| cm, axe \| invoker` | Same, plus your team (after the 1st `\|`) and bans (after the 2nd) |
 | `/counters phantom assassin` | Heroes that beat this hero |
@@ -119,6 +120,17 @@ sleep after" → **Never**. The screen can still turn off.
 ### 4. (Optional) Start with Windows
 Press Win+R, type `shell:startup` and press Enter. Put a shortcut to `scripts\run_bot.bat`
 in that folder.
+
+### 5. (Optional) Turn on `/ask` (the general predictor)
+`/ask` needs a language model. It only reads the question and words the answer; the numbers
+come from our models. Add **one** of these to `.env` (no restart needed):
+
+| Option | Setup | Notes |
+|---|---|---|
+| Groq, in the cloud (free) | Make a key at console.groq.com, add `groq_api = gsk_...` | Best English and Dota knowledge. Questions and command replies are sent to Groq. |
+| Ollama, on this laptop | Install Ollama, run `ollama pull qwen3:4b`, add `ollama_model = qwen3:4b` | Nothing leaves the laptop. ~2.5 GB download, uses the 4 GB GPU, slower and weaker. |
+
+Then `/evaluate general` checks how often it picks a right command for 13 test questions.
 
 ### Updating to new code
 
