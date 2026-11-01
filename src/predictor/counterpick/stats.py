@@ -12,7 +12,7 @@ The "edge" of a matchup works like Dotabuff's advantage: the actual win rate min
 two heroes' usual win rates predict. +0.05 = 5 win-rate points better than expected.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -150,10 +150,14 @@ class DayTable:
     slices: dict  # (patch, medal) -> Slice
     with_games: np.ndarray  # (H, H): games with both heroes on the same team
     with_wins: np.ndarray  # (H, H)
+    blocks: list = field(default_factory=list)  # [(t0, t1)] time ranges already counted in here
 
     @classmethod
     def empty(cls) -> "DayTable":
         return cls({}, np.zeros((N_HEROES, N_HEROES), np.int64), np.zeros((N_HEROES, N_HEROES), np.int64))
+
+    def has_block(self, t0: int, t1: int) -> bool:
+        return any(a < t1 and t0 < b for a, b in self.blocks)
 
     def slice(self, key: tuple[str, int]) -> Slice:
         if key not in self.slices:
@@ -164,7 +168,8 @@ class DayTable:
         slices = dict(self.slices)
         for key, s in other.slices.items():
             slices[key] = slices[key] + s if key in slices else s
-        return DayTable(slices, self.with_games + other.with_games, self.with_wins + other.with_wins)
+        return DayTable(slices, self.with_games + other.with_games, self.with_wins + other.with_wins,
+                        self.blocks + other.blocks)
 
     @property
     def n_matches(self) -> int:
@@ -200,6 +205,7 @@ class DayTable:
                 last=np.array([-1 if x.last is None else x.last for x in s], dtype=np.int64),
                 with_games=self.with_games.astype(np.int32),
                 with_wins=self.with_wins.astype(np.int32),
+                blocks=np.array(self.blocks, dtype=np.int64).reshape(-1, 2),
             )
 
     @classmethod
@@ -210,7 +216,8 @@ class DayTable:
             first, last = int(z["first"][i]), int(z["last"][i])
             slices[(str(p), int(m))] = Slice(z["vs_games"][i].astype(np.int64), z["vs_wins"][i].astype(np.int64),
                                              int(z["n"][i]), None if first < 0 else first, None if last < 0 else last)
-        return cls(slices, z["with_games"].astype(np.int64), z["with_wins"].astype(np.int64))
+        blocks = [(int(a), int(b)) for a, b in z["blocks"]] if "blocks" in z else []  # older files: none recorded
+        return cls(slices, z["with_games"].astype(np.int64), z["with_wins"].astype(np.int64), blocks)
 
     @classmethod
     def from_matches(cls, df: pd.DataFrame) -> "DayTable":

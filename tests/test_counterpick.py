@@ -157,6 +157,12 @@ def test_update_counts_every_game_exactly_once(tmp_path, monkeypatch):
     update_mod.update(backfill_blocks=10_000, api=api, now=later)
     assert len(api.queries) == asked  # nothing left to count
     state = update_mod.load_state()
+    # The bot is stopped after a table was saved but before state.json: the cursors are a
+    # block behind. The next run must skip those blocks, not count them twice.
+    update_mod.save_state({"counted_from": state["counted_from"] + update_mod.BLOCK,
+                           "counted_until": state["counted_until"] - update_mod.BLOCK})
+    update_mod.update(backfill_blocks=10_000, api=api, now=later)
+    assert len(api.queries) == asked and update_mod.load_state() == state
     window_start = (later // 86400 - 4) * 86400
     ready = (later - update_mod.LAG) // update_mod.BLOCK * update_mod.BLOCK
     assert (state["counted_from"], state["counted_until"]) == (window_start, ready)
