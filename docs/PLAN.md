@@ -95,9 +95,14 @@ Each phase ends with something that works and that we can demo. Do them in order
 - `counterpick/stats.py`: raw wins/games per hero and hero pair, kept as **one small table per
   day**. The bot sums the **last 90 days**. Edge = real win rate in a matchup minus what the two
   heroes' usual win rates predict (like Dotabuff's advantage). Pairs under 200 games are hidden.
-- `counterpick/update.py`, run by the bot **every hour**: fetch new public games (all ranks),
-  backfill older games until the 90-day window is full, add them to the daily tables, and keep
-  only 7 days of raw games. Leaves 400 OpenDota calls/day for the other models.
+- `counterpick/update.py`, run by the bot **every hour**: OpenDota's database counts the games
+  for us (one SQL query per 4-hour block returns the wins and games of every hero pair, split
+  by medal), so we get **every ranked public game OpenDota lists, ~550,000 a day**, not a
+  sample, for ~6 calls a day. Older blocks are counted until the 90-day window is full.
+  (Until 2026-11-01 it downloaded 100 pages of games an hour, ~110k games a day with gaps, and
+  backfill never got a turn. Asilbek noticed /apick only went back to Oct 31.)
+- Asilbek's `/apick` and website: the last **30 days** (he asked for data from Oct 1), filters
+  by medal and patch; same numbers as his `build_snapshot()` on the same games.
 - The old trained counter model was removed.
 - Check vs Dotabuff (Phantom Lancer, after one day of data): 8 of our top 10 counters are in
   Dotabuff's top 14 (Tidehunter, Axe, Timbersaw, Underlord, Sand King, Warlock, CM, Sven).

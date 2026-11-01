@@ -108,8 +108,13 @@ its ranking rules in `web/static/engine.js`, change `src/predictor/counterpick/e
 way (`tests/test_counterpick_engine.py` checks the counting against `statistics.py`).
 
 Put new website code in `web/` and import models from the package
-(`from predictor.counterpick import MatchupStats`) instead of copying code. Note: the raw file
-`data/raw/public_matches.parquet` now only keeps the **last 7 days**. The 90-day numbers live in
-the daily tables `data/counterpick/*.npz` (`MatchupStats.from_daily(...)`). If the site
-needs an HTTP API, add a small FastAPI app under `web/` that loads the same model files.
+(`from predictor.counterpick import MatchupStats`) instead of copying code.
+
+Data: the counter-pickers don't use raw public games any more (`data/raw/public_matches.parquet`
+is no longer updated). The bot fills one table per UTC day, `data/counterpick/YYYY-MM-DD.npz`
+(`stats.DayTable`: hero-vs-hero games and wins per patch and medal, plus hero-with-hero), every
+hour from OpenDota's database (`counterpick/update.py`, one SQL query per 4-hour block, every
+public game OpenDota lists). Read them with `engine.window_counts(...)` (Asilbek's numbers, last
+N days, medal/patch filters) or `MatchupStats.from_daily(...)` (90 days, Dotabuff-style edges).
+If the site needs an HTTP API, add a small FastAPI app under `web/` that loads the same files.
 Don't change model file formats without updating `bot.py` too.

@@ -4,8 +4,9 @@ For every hero, and every pair of heroes, we count games and wins:
     vs[a, b]    a on one team, b on the other   -> a's win rate against b
     with_[a, b] a and b on the same team        -> a's win rate together with b
 
-Counts are kept per day (data/counterpick/YYYY-MM-DD.npz), so the last WINDOW_DAYS days can
-be summed quickly and old days simply fall out of the window.
+Counts are kept per day (data/counterpick/YYYY-MM-DD.npz, a DayTable split by patch and
+medal for Asilbek's /apick), so the last WINDOW_DAYS days can be summed quickly and old days
+simply fall out of the window. update.py fills them from OpenDota's database.
 
 The "edge" of a matchup works like Dotabuff's advantage: the actual win rate minus what the
 two heroes' usual win rates predict. +0.05 = 5 win-rate points better than expected.
@@ -20,7 +21,7 @@ import pandas as pd
 
 from .. import DATA_DIR
 from ..io import atomic_write
-from ..data import hero_arrays
+from ..data import D_COLS, R_COLS, hero_arrays
 
 DAILY_DIR = DATA_DIR / "counterpick"
 WINDOW_DAYS = 90  # Asilbek: use the last 3 months
@@ -96,6 +97,152 @@ class Counts:
         return cls(z["games"], z["wins"], z["vs_games"], z["vs_wins"], z["with_games"], z["with_wins"], int(z["n_matches"]))
 
 
+def valid_rows(df: pd.DataFrame) -> pd.Series:
+    """Games Asilbek's build_snapshot() would count: positive match id, 10 different positive
+    hero ids, a True/False result."""
+    heroes = df[R_COLS + D_COLS].apply(pd.to_numeric, errors="coerce")
+    ints = heroes.notna().all(axis=1) & (heroes.fillna(0) % 1 == 0).all(axis=1) & (heroes.fillna(0) > 0).all(axis=1)
+    distinct = heroes.nunique(axis=1) == 10
+    mid = pd.to_numeric(df["match_id"], errors="coerce")
+    good_id = mid.notna() & (mid > 0) & (mid.fillna(0) % 1 == 0)
+    result_ok = df["radiant_win"].map(lambda v: isinstance(v, (bool, np.bool_)))
+    return ints & distinct & good_id & result_ok
+
+
+def medal_of(avg_rank_tier: pd.Series) -> np.ndarray:
+    """A game's avg_rank_tier (10 * medal + stars, Immortal = 80) -> medal 1 (Herald) to
+    8 (Immortal); 0 when it's missing or not a real tier. Same rule as the SQL in update.py."""
+    t = pd.to_numeric(avg_rank_tier, errors="coerce").to_numpy(dtype=float)
+    real = (t % 1 == 0) & (((t >= 10) & (t < 80) & (t % 10 <= 5)) | (t == 80))
+    return np.where(real, np.nan_to_num(t) // 10, 0).astype(int)
+
+
+@dataclass
+class Slice:
+    """Hero-vs-hero counts of the games of one (patch, medal) on one day."""
+
+    games: np.ndarray  # (H, H): games of row hero against column hero
+    wins: np.ndarray  # (H, H): wins of row hero
+    n: int = 0  # games
+    first: int | None = None  # earliest start_time
+    last: int | None = None  # latest start_time
+
+    @classmethod
+    def empty(cls) -> "Slice":
+        return cls(np.zeros((N_HEROES, N_HEROES), np.int64), np.zeros((N_HEROES, N_HEROES), np.int64))
+
+    def __add__(self, other: "Slice") -> "Slice":
+        firsts = [t for t in (self.first, other.first) if t is not None]
+        lasts = [t for t in (self.last, other.last) if t is not None]
+        return Slice(self.games + other.games, self.wins + other.wins, self.n + other.n,
+                     min(firsts) if firsts else None, max(lasts) if lasts else None)
+
+
+@dataclass
+class DayTable:
+    """One UTC day of public games: hero-vs-hero counts split by (patch, medal), so Asilbek's
+    /apick can filter on rank and patch, plus hero-with-hero counts over all of them.
+    counts() adds the slices up into the all-ranks Counts that MatchupStats uses.
+
+    The bot gets these numbers from OpenDota's database (update.py); from_matches() counts the
+    same way from a table of games (tests, checks)."""
+
+    slices: dict  # (patch, medal) -> Slice
+    with_games: np.ndarray  # (H, H): games with both heroes on the same team
+    with_wins: np.ndarray  # (H, H)
+
+    @classmethod
+    def empty(cls) -> "DayTable":
+        return cls({}, np.zeros((N_HEROES, N_HEROES), np.int64), np.zeros((N_HEROES, N_HEROES), np.int64))
+
+    def slice(self, key: tuple[str, int]) -> Slice:
+        if key not in self.slices:
+            self.slices[key] = Slice.empty()
+        return self.slices[key]
+
+    def __add__(self, other: "DayTable") -> "DayTable":
+        slices = dict(self.slices)
+        for key, s in other.slices.items():
+            slices[key] = slices[key] + s if key in slices else s
+        return DayTable(slices, self.with_games + other.with_games, self.with_wins + other.with_wins)
+
+    @property
+    def n_matches(self) -> int:
+        return sum(s.n for s in self.slices.values())
+
+    def select(self, medals=None, patch: str | None = None) -> Slice:
+        """Hero-vs-hero counts of the games of these medals (None = every game) and patch."""
+        total = Slice.empty()
+        for (p, m), s in self.slices.items():
+            if (medals is None or m in medals) and (patch is None or p == patch):
+                total = total + s
+        return total
+
+    def counts(self) -> Counts:
+        vs = self.select()
+        # each game gives a hero 5 enemies, so a hero's games = its enemy pairs / 5
+        return Counts(vs.games.sum(1) / 5, vs.wins.sum(1) / 5, vs.games.astype(float), vs.wins.astype(float),
+                      self.with_games.astype(float), self.with_wins.astype(float), vs.n)
+
+    def save(self, path: Path) -> None:
+        keys = list(self.slices)
+        s = [self.slices[k] for k in keys]
+        stack = lambda arrays: np.stack(arrays).astype(np.int32) if arrays else np.zeros((0, N_HEROES, N_HEROES), np.int32)
+        with atomic_write(path) as tmp, open(tmp, "wb") as fh:  # a file handle: numpy won't add ".npz"
+            np.savez_compressed(
+                fh,
+                patch=np.array([p for p, _ in keys], dtype=str),
+                medal=np.array([m for _, m in keys], dtype=np.int64),
+                vs_games=stack([x.games for x in s]),
+                vs_wins=stack([x.wins for x in s]),
+                n=np.array([x.n for x in s], dtype=np.int64),
+                first=np.array([-1 if x.first is None else x.first for x in s], dtype=np.int64),
+                last=np.array([-1 if x.last is None else x.last for x in s], dtype=np.int64),
+                with_games=self.with_games.astype(np.int32),
+                with_wins=self.with_wins.astype(np.int32),
+            )
+
+    @classmethod
+    def load(cls, path: Path) -> "DayTable":
+        z = np.load(path)
+        slices = {}
+        for i, (p, m) in enumerate(zip(z["patch"], z["medal"])):
+            first, last = int(z["first"][i]), int(z["last"][i])
+            slices[(str(p), int(m))] = Slice(z["vs_games"][i].astype(np.int64), z["vs_wins"][i].astype(np.int64),
+                                             int(z["n"][i]), None if first < 0 else first, None if last < 0 else last)
+        return cls(slices, z["with_games"].astype(np.int64), z["with_wins"].astype(np.int64))
+
+    @classmethod
+    def from_matches(cls, df: pd.DataFrame) -> "DayTable":
+        """Count a table of games: valid ones only, each match id once (like build_snapshot)."""
+        table = cls.empty()
+        df = df[valid_rows(df)].drop_duplicates("match_id", keep="first") if len(df) else df
+        if df.empty:
+            return table
+        patch = df["patch"] if "patch" in df else pd.Series(None, index=df.index)
+        patch = patch.map(lambda p: p if isinstance(p, str) else "")
+        times = pd.to_numeric(df["start_time"], errors="coerce") if "start_time" in df else pd.Series(np.nan, index=df.index)
+        rank = df["avg_rank_tier"] if "avg_rank_tier" in df else pd.Series(np.nan, index=df.index)
+        keyed = pd.DataFrame({"patch": patch, "medal": medal_of(rank)}, index=df.index)
+        R = df[R_COLS].to_numpy(np.int64)
+        D = df[D_COLS].to_numpy(np.int64)
+        y = df["radiant_win"].to_numpy(dtype=float)
+        for (p, m), rows in keyed.groupby(["patch", "medal"]).indices.items():
+            g1, w1 = _pair_counts(R[rows], D[rows], y[rows])
+            g2, w2 = _pair_counts(D[rows], R[rows], 1.0 - y[rows])
+            t = times.iloc[rows]
+            t = t[(t > 0) & (t % 1 == 0)]
+            table.slices[(p, int(m))] = Slice((g1 + g2).astype(np.int64), (w1 + w2).astype(np.int64), len(rows),
+                                              int(t.min()) if len(t) else None, int(t.max()) if len(t) else None)
+        h1, x1 = _pair_counts(R, R, y)
+        h2, x2 = _pair_counts(D, D, 1.0 - y)
+        with_games, with_wins = (h1 + h2).astype(np.int64), (x1 + x2).astype(np.int64)
+        np.fill_diagonal(with_games, 0)
+        np.fill_diagonal(with_wins, 0)
+        table.with_games, table.with_wins = with_games, with_wins
+        return table
+
+
 def day_path(day: str) -> Path:
     return DAILY_DIR / f"{day}.npz"
 
@@ -126,7 +273,7 @@ class MatchupStats:
         files = daily_files(window_days)
         total = Counts.empty()
         for f in files:
-            total = total + Counts.load(f)
+            total = total + DayTable.load(f).counts()
         return cls(total, hero_names, files[0].stem if files else "", files[-1].stem if files else "")
 
     def __post_init__(self):

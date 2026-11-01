@@ -2,7 +2,9 @@
 
 import json
 import os
+import shutil
 import threading
+import time
 from urllib.error import HTTPError
 from urllib.request import urlopen
 
@@ -10,7 +12,15 @@ import pandas as pd
 import pytest
 
 import predictor.data as data
+from predictor.counterpick import stats
 from web import server
+
+NOW = int(time.time()) // 86400 * 86400 + 3600  # 01:00 UTC today: all test games on one day
+
+
+def _save_tables(games):
+    """The site reads the counter-picker's daily tables (filled hourly by the bot)."""
+    stats.DayTable.from_matches(pd.DataFrame(games)).save(stats.day_path(time.strftime("%Y-%m-%d", time.gmtime(NOW))))
 
 
 def _match(match_id, radiant_win, rank, patch, timestamp):
@@ -32,23 +42,22 @@ def local_site(tmp_path, monkeypatch):
         {"id": i, "localized_name": f"Hero {i}", "name": f"npc_dota_hero_h{i}"}
         for i in range(1, 11)
     ]), encoding="utf-8")
-    public_path = tmp_path / "public.parquet"
-    pd.DataFrame([
-        _match(1, True, 35, "7.41", 100),
-        _match(2, False, 75, "7.41", 200),
-        _match(3, False, 35, "7.40", 300),
-    ]).to_parquet(public_path, index=False)
+    tables = tmp_path / "counterpick"
+    monkeypatch.setattr(stats, "DAILY_DIR", tables)
+    _save_tables([
+        _match(1, True, 35, "7.41", NOW + 100),
+        _match(2, False, 75, "7.41", NOW + 200),
+        _match(3, False, 35, "7.40", NOW + 300),
+    ])
 
     monkeypatch.setattr(data, "HEROES_PATH", heroes_path)
-    monkeypatch.setitem(data.SOURCES, "public", public_path)
     monkeypatch.setattr(server, "HEROES_PATH", heroes_path)
-    monkeypatch.setattr(server, "PUBLIC_PATH", public_path)
     server._cache.clear()
     httpd = server.ThreadingHTTPServer(("127.0.0.1", 0), server.Handler)
     worker = threading.Thread(target=httpd.serve_forever, daemon=True)
     worker.start()
     try:
-        yield f"http://127.0.0.1:{httpd.server_port}", public_path, heroes_path
+        yield f"http://127.0.0.1:{httpd.server_port}", tables, heroes_path
     finally:
         httpd.shutdown()
         worker.join()
@@ -75,7 +84,7 @@ def test_heroes_and_directional_results_with_rank_and_patch(local_site):
     assert status == 200
     assert result["gamesScanned"] == 3
     assert result["gamesEligible"] == 1
-    assert result["oldestTimestamp"] == result["newestTimestamp"] == 100
+    assert result["oldestTimestamp"] == result["newestTimestamp"] == NOW + 100
     pairs = {(row["hero_id"], row["enemy_id"]): row for row in result["pairwise"]}
     assert (pairs[1, 6]["wins"], pairs[1, 6]["matches"]) == (1, 1)
     assert (pairs[6, 1]["wins"], pairs[6, 1]["matches"]) == (0, 1)
@@ -88,7 +97,7 @@ def test_heroes_and_directional_results_with_rank_and_patch(local_site):
 
 @pytest.mark.parametrize("query", [
     "rank_min=81", "rank_min=50&rank_max=30", "rank_min=abc", "patch=not-a-patch",
-    "rank_min=30&rank_min=40", "unknown=1",
+    "rank_min=30&rank_min=40", "unknown=1", "rank_min=52&rank_max=63",  # the tables keep whole medals
 ])
 def test_invalid_filters_return_400(local_site, query):
     status, body = _get(local_site[0], f"/api/sample?{query}")
@@ -97,20 +106,21 @@ def test_invalid_filters_return_400(local_site, query):
 
 
 def test_missing_dataset_returns_503(local_site):
-    base, public_path, _ = local_site
-    public_path.unlink()
+    base, tables, _ = local_site
+    shutil.rmtree(tables)
     status, body = _get(base, "/api/sample")
     assert status == 503
     assert "missing" in body["error"].lower()
 
 
 def test_sample_cache_refreshes_when_dataset_changes(local_site):
-    base, public_path, _ = local_site
+    base, tables, _ = local_site
     assert _get(base, "/api/sample")[1]["gamesEligible"] == 3
-    before = public_path.stat().st_mtime_ns
-    pd.DataFrame([_match(4, True, 35, "7.41", 400)]).to_parquet(public_path, index=False)
-    os.utime(public_path, ns=(before + 2_000_000_000, before + 2_000_000_000))
+    path = next(tables.glob("*.npz"))
+    before = path.stat().st_mtime_ns
+    _save_tables([_match(4, True, 35, "7.41", NOW + 400)])
+    os.utime(path, ns=(before + 2_000_000_000, before + 2_000_000_000))
     status, body = _get(base, "/api/sample")
     assert status == 200
     assert body["gamesEligible"] == 1
-    assert body["oldestTimestamp"] == 400
+    assert body["oldestTimestamp"] == NOW + 400

@@ -41,15 +41,9 @@ help section, `/status` line, `/train <name>` and `/evaluate <name>` on its own.
 
 Order: **build → evaluate → host in the bot → next model.**
 
-## Daily data run
+## Data runs
 
-From the bot: `/collect public 2500` then `/train counterpick`.
-
-From your own computer, with your own OpenDota quota (3,000 calls/day per connection):
-
-```bash
-python -m predictor.data.collect public --calls 2500 --min-rank 70
-```
-
-That takes about 45 minutes. Send the resulting `data/raw/public_matches.parquet` to the
-host to merge. Duplicates are removed by `match_id`.
+Nothing to do by hand any more. Every hour the bot counts every public game OpenDota lists
+into the counter-picker's daily tables (OpenDota's database does the counting, a few calls a
+day), and every night at 05:00 it fetches new pro matches and retrains the pro models.
+`/train counterpick` and `/refresh` run them right away.

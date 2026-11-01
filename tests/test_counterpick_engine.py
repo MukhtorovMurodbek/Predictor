@@ -1,9 +1,13 @@
+import time
+
 import numpy as np
 import pandas as pd
 import pytest
 
-from predictor.counterpick.engine import PairCounts, pair_counts, rank_candidates
+from predictor.counterpick import stats
+from predictor.counterpick.engine import PairCounts, medals_for, pair_counts, rank_candidates, snapshot, window_counts
 from predictor.counterpick.statistics import build_snapshot
+from predictor.counterpick.stats import DayTable
 from predictor.data import D_COLS, R_COLS
 
 HEROES = {i: f"Hero {i:02d}" for i in range(1, 21)}
@@ -46,6 +50,37 @@ def test_same_numbers_as_build_snapshot(rank_min, rank_max, patch):
     assert ours.eligible == snap["gamesEligible"]
     assert np.array_equal(ours.games, games) and np.array_equal(ours.wins, wins)
     assert (ours.oldest, ours.newest) == (snap["oldestTimestamp"], snap["newestTimestamp"])
+
+
+@pytest.mark.parametrize("rank_min,rank_max,patch", [
+    (None, None, None), (40, 55, None), (None, 35, "7.41"), (80, 80, "7.40"), (10, 15, None), (70, None, "7.41"),
+])
+def test_daily_tables_give_build_snapshot_numbers(tmp_path, monkeypatch, rank_min, rank_max, patch):
+    """/apick and the website read daily tables; per medal they must match build_snapshot."""
+    monkeypatch.setattr(stats, "DAILY_DIR", tmp_path)
+    df = messy_matches()
+    now = int(time.time())
+    df["start_time"] = now - 3600 - (df["match_id"] % 3) * 86400 - df["match_id"] % 500  # spread over 3 days
+    day = pd.to_datetime(df["start_time"], unit="s", utc=True).dt.strftime("%Y-%m-%d")
+    for d, part in df.groupby(day):
+        DayTable.from_matches(part).save(stats.day_path(d))
+    snap = build_snapshot(df, HEROES, rank_min=rank_min, rank_max=rank_max, patch=patch)
+    ours = window_counts(rank_min, rank_max, patch, days=30)
+    wins, games = snapshot_arrays(snap)
+    assert ours.eligible == snap["gamesEligible"] > 0
+    assert np.array_equal(ours.games, games) and np.array_equal(ours.wins, wins)
+    assert (ours.oldest, ours.newest) == (snap["oldestTimestamp"], snap["newestTimestamp"])
+    site = snapshot(HEROES, rank_min, rank_max, patch, days=30)
+    assert site["gamesEligible"] == snap["gamesEligible"]
+    assert sorted(map(tuple, (r.values() for r in site["pairwise"]))) == sorted(map(tuple, (r.values() for r in snap["pairwise"])))
+
+
+def test_rank_filters_need_whole_medals():
+    assert medals_for(None, None) is None
+    assert medals_for(40, 45) == {4} and medals_for(30, 55) == {3, 4, 5} and medals_for(None, 35) == {1, 2, 3}
+    assert medals_for(80, 80) == {8} and medals_for(70, None) == {7, 8}
+    with pytest.raises(ValueError):
+        medals_for(52, 63)
 
 
 def test_ranking_follows_engine_js_rules():
