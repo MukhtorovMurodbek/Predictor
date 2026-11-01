@@ -41,7 +41,7 @@ def help_text() -> str:
         "<b>🏆 Tournament (TI) predictor</b> (uses the pro match predictor)",
         "/odds — who wins if the 16 strongest active teams played a TI today",
         "/odds <i>team, team, ...</i> — title chances for the teams you list (8 or more)",
-        "   <code>/odds spirit, falcons, liquid, navi, tundra, gaimin, xtreme, parivision</code>",
+        "   <code>/odds spirit, yandex, parivision, liquid, navi, falcons, tundra, xtreme</code>",
         "Format like recent TIs: Swiss stage (Bo3, 3 wins through / 3 losses out) → 8-team double elimination, grand final Bo5. "
         f"Each event is simulated {N_SIMS:,} times.",
         *_backtest_lines(),
