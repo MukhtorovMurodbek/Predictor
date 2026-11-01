@@ -36,13 +36,15 @@ provider fields, use hero IDs (2 is Axe, 12 is Phantom Lancer):
 ```bash
 python -m predictor.counterpick.stratz --hero-id 2 --opponent-id 12
 python -m predictor.counterpick.stratz --hero-id 2 --opponent-id 12 --bracket HERALD_GUARDIAN
+python -m predictor.counterpick.stratz --hero-id 2 --opponent-id 12 --week-start 1793232000
 ```
 
 The diagnostic reports a requested bracket separately from the returned
 bracket label and does not print the token. Live tests returned `UNCALIBRATED`
 even when a particular bracket was requested. Opposite query directions also
-returned different sample sizes. The meaning of these fields and the week
-window remain unverified; `matchUp` exposes no explicit patch argument. Do not
+returned different sample sizes. Three tested Unix-second week starts returned
+distinct week IDs, but coverage, overlap and exact window semantics remain
+unverified. `matchUp` exposes no explicit patch argument. Do not
 use them as rank- or patch-specific recommendations until clarified. Stop and
 respect the provider's limit if it returns HTTP 429. API availability, token
 eligibility, permitted uses, attribution and rate limits should be confirmed

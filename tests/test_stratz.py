@@ -151,7 +151,8 @@ def test_matchup_no_row_is_explicit(capsys, monkeypatch):
 
 def test_matchup_flags_must_be_complete_and_distinct(monkeypatch):
     monkeypatch.setattr(stratz, "read_token", lambda: pytest.fail("No request should be made"))
-    for args in (["--hero-id", "2"], ["--bracket", "DIVINE_IMMORTAL"], ["--hero-id", "2", "--opponent-id", "2"]):
+    for args in (["--hero-id", "2"], ["--bracket", "DIVINE_IMMORTAL"], ["--week-start", "1793232000"],
+                 ["--hero-id", "2", "--opponent-id", "2"], ["--hero-id", "2", "--opponent-id", "12", "--week-start", "-1"]):
         with pytest.raises(SystemExit) as exc:
             stratz.main(args)
         assert exc.value.code == 2
@@ -167,3 +168,20 @@ def test_unexpected_provider_bracket_is_never_printed(capsys, monkeypatch):
     assert stratz.main(["--hero-id", "2", "--opponent-id", "12"]) == 1
     captured = capsys.readouterr()
     assert "secret_token" not in captured.out + captured.err
+
+
+def test_week_start_is_sent_as_unix_seconds_and_returned_week_is_not_reinterpreted(capsys, monkeypatch):
+    session = Session(Response(), _matchup_response())
+    client = stratz.StratzClient("example-token", session=session)
+    monkeypatch.setattr(stratz, "read_token", lambda: "example-token")
+    monkeypatch.setattr(stratz, "StratzClient", lambda token: client)
+    assert stratz.main(["--hero-id", "2", "--opponent-id", "12", "--week-start", "1793232000"]) == 0
+    output = capsys.readouterr().out
+    assert "weekStart=1793232000" in output
+    assert "week=2965" in output
+    assert "time-window" in output and "unverified" in output
+    assert len(session.calls) == 2
+    request = session.calls[1][1]["json"]
+    assert request["variables"] == {"hero": 2, "brackets": None, "week": 1793232000}
+    assert "week: $week" in request["query"]
+    assert "example-token" not in output

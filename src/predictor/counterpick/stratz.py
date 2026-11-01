@@ -40,6 +40,14 @@ MATCHUP_QUERY = """query CounterpickMatchup($hero: Short, $brackets: [RankBracke
     }
   }
 }"""
+MATCHUP_WEEK_QUERY = """query CounterpickMatchup($hero: Short, $brackets: [RankBracketBasicEnum!], $week: Long) {
+  heroStats {
+    matchUp(heroId: $hero, bracketBasicIds: $brackets, week: $week, take: 200) {
+      heroId
+      vs { heroId1 heroId2 week bracketBasicIds winCount matchCount }
+    }
+  }
+}"""
 
 
 class StratzError(Exception):
@@ -137,14 +145,19 @@ def describe_matchup_schema(client: StratzClient) -> dict:
     return {"query_type": root, "hero_stats_type": hero_type, "matchup_type": _base_type(matchup.get("type")), "arguments": arguments}
 
 
-def matchup_rows(client: StratzClient, hero_id: int, opponent_id: int, bracket: str | None = None) -> list[dict]:
+def matchup_rows(client: StratzClient, hero_id: int, opponent_id: int, bracket: str | None = None, week_start: int | None = None) -> list[dict]:
     """Return selected provider rows unchanged; do not aggregate or invert them."""
     if any(isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 32767
            for value in (hero_id, opponent_id)) or hero_id == opponent_id:
         raise StratzError("Choose two different positive hero IDs.")
     if bracket not in (None, "HERALD_GUARDIAN", "DIVINE_IMMORTAL"):
         raise StratzError("Unsupported bracket selection.")
-    data = client.query(MATCHUP_QUERY, {"hero": hero_id, "brackets": [bracket] if bracket else None})
+    if week_start is not None and (isinstance(week_start, bool) or not isinstance(week_start, int) or not 0 <= week_start <= 9223372036854775807):
+        raise StratzError("Week start must be a non-negative Unix timestamp.")
+    variables = {"hero": hero_id, "brackets": [bracket] if bracket else None}
+    if week_start is not None:
+        variables["week"] = week_start
+    data = client.query(MATCHUP_WEEK_QUERY if week_start is not None else MATCHUP_QUERY, variables)
     stats = data.get("heroStats")
     groups = stats.get("matchUp") if isinstance(stats, dict) else None
     if not isinstance(groups, list):
@@ -173,11 +186,14 @@ def main(argv=None):
     parser.add_argument("--hero-id", type=int, help="First hero ID as requested from STRATZ")
     parser.add_argument("--opponent-id", type=int, help="Opponent hero ID to display")
     parser.add_argument("--bracket", choices=("HERALD_GUARDIAN", "DIVINE_IMMORTAL"), help="Optional bracket argument")
+    parser.add_argument("--week-start", type=int, help="Optional week argument as a Unix timestamp in seconds")
     args = parser.parse_args(argv)
-    if (args.hero_id is None) != (args.opponent_id is None) or (args.bracket and args.hero_id is None):
-        parser.error("--hero-id and --opponent-id must be supplied together; --bracket also requires them")
+    if (args.hero_id is None) != (args.opponent_id is None) or ((args.bracket is not None or args.week_start is not None) and args.hero_id is None):
+        parser.error("--hero-id and --opponent-id must be supplied together; --bracket and --week-start also require them")
     if args.hero_id is not None and (not 1 <= args.hero_id <= 32767 or not 1 <= args.opponent_id <= 32767 or args.hero_id == args.opponent_id):
         parser.error("choose two different positive hero IDs")
+    if args.week_start is not None and not 0 <= args.week_start <= 9223372036854775807:
+        parser.error("--week-start must be a non-negative Unix timestamp")
     try:
         client = StratzClient(read_token())
         data = client.query(AUTH_QUERY)
@@ -185,8 +201,9 @@ def main(argv=None):
             raise StratzError("STRATZ returned an unexpected connection response.")
         print("STRATZ connection succeeded.")
         if args.hero_id is not None:
-            rows = matchup_rows(client, args.hero_id, args.opponent_id, args.bracket)
-            print(f"Requested heroId={args.hero_id}, opponentId={args.opponent_id}, bracket={args.bracket or 'not supplied'}.")
+            rows = matchup_rows(client, args.hero_id, args.opponent_id, args.bracket, args.week_start)
+            requested_week = args.week_start if args.week_start is not None else "not supplied"
+            print(f"Requested heroId={args.hero_id}, opponentId={args.opponent_id}, bracket={args.bracket or 'not supplied'}, weekStart={requested_week}.")
             print("Raw provider rows (rank, patch, time-window and win direction are unverified):")
             for row in rows:
                 print(", ".join(f"{key}={value}" for key, value in row.items()))
