@@ -77,6 +77,10 @@ def test_daily_tables_window_and_pruning(tmp_path, monkeypatch):
     assert stats.n_matches == 300
     assert len(update_mod.prune_raw(df)) == 300
 
+    more = as_frame(*synthetic_matches(50, seed=2), start=now - 1800)  # newly fetched games
+    update_mod.add_to_days(more)
+    assert MatchupStats.from_daily(HEROES).n_matches == 350
+
 
 def test_resolve_heroes():
     names = {1: "Anti-Mage", 44: "Phantom Assassin", 12: "Phantom Lancer", 5: "Crystal Maiden", 120: "Pangolier"}

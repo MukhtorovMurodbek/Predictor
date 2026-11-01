@@ -220,12 +220,13 @@ def _public_batch_to_rows(batch: list[dict]) -> list[dict]:
 
 
 def collect_public(
-    api: OpenDota, calls: int, min_rank: int | None, save_every: int = 50, stop_at_id: int | None = None, min_quota: int = 0
+    api: OpenDota, calls: int, min_rank: int | None, save_every: int = 50, stop_at_id: int | None = None,
+    min_quota: int = 0, start_before: int | None = None,
 ) -> int:
-    """Page backwards through /publicMatches, newest first. Each call returns up to 100 matches.
-    Stops early at match `stop_at_id` (already saved) or when fewer than `min_quota` calls are
-    left today. Returns the number of API calls made."""
-    cursor, rows, total, made = None, [], 0, 0
+    """Page backwards through /publicMatches, newest first (or from `start_before`). Each call
+    returns up to 100 matches. Stops early at match `stop_at_id` (already saved) or when fewer
+    than `min_quota` calls are left today. Returns the number of API calls made."""
+    cursor, rows, total, made = start_before, [], 0, 0
 
     def flush():
         nonlocal rows, total

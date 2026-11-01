@@ -17,10 +17,10 @@ finally one **universal model** that does everything.
 
 | # | Model | Trained on | Status | Bot commands |
 |---|---|---|---|---|
-| 1 | Counter-picker | public ranked games | ✅ live in the bot | `/counterpick` `/pick` `/counters` `/hero` |
+| 1 | Counter-picker (statistics, no model) | public games, all ranks, last 90 days, auto-updated hourly | ✅ live in the bot | `/counterpick` `/pick` `/counters` `/hero` |
 | 2 | Pro match predictor | pro matches only | ✅ live in the bot | `/pro` `/predict` `/team` `/top` |
 | 3 | Pro draft predictor (next pick/ban) | pro drafts only | ✅ live in the bot | `/draft` `/next` |
-| 4 | Live in-game predictor | pro match timelines | ⬜ | — |
+| 4 | Live in-game predictor | pro match timelines | ✅ live in the bot | `/livepro` `/live` `/ingame` |
 | 5 | Tournament (TI) predictor | pro results | ⬜ | — |
 | 6 | Universal model | everything | ⬜ last | — |
 
@@ -55,9 +55,8 @@ python -m predictor.data.collect heroes
 python -m predictor.data.collect pro                 # since 2023 the first time, then only new matches
 python -m predictor.data.collect public --calls 500 --min-rank 70
 
-# model 1: counter-picker
-python -m predictor.counterpick.train
-python -m predictor.counterpick.evaluate
+# model 1: counter-picker (statistics; the bot runs the update every hour by itself)
+python -m predictor.counterpick.update               # fetch new games + update daily tables
 python -m predictor.counterpick.recommend --enemies "pa, pudge, lion" --allies "cm"
 python -m predictor.counterpick.recommend --counters "Phantom Assassin"
 
@@ -68,6 +67,9 @@ python -m predictor.pro.evaluate
 # model 3: pro draft predictor
 python -m predictor.draft.train                      # ~4 min, prints its top-5 accuracy
 
+# model 4: live in-game predictor
+python -m predictor.live.train                       # ~3 min
+
 # the bot (host only, see docs/BOT.md)
 python -m predictor.bot
 ```
@@ -77,10 +79,11 @@ python -m predictor.bot
 ```
 src/predictor/
   data/            shared: OpenDota client, collectors, loading matches, hero names
-  counterpick/     model 1: model.py, train.py, evaluate.py, recommend.py (CLI), bot.py (bot commands)
+  counterpick/     model 1: stats.py (daily win/game counts), update.py (hourly refresh), recommend.py (CLI), bot.py
   bot/             Telegram bot: app.py, auth.py (allowed users), admin.py (/collect /train), registry.py (hosted models)
   pro/             model 2: features.py (ratings, form, draft), model.py, train.py, evaluate.py, bot.py
   draft/           model 3: features.py (draft habits), model.py, train.py, bot.py
+  live/            model 4: features.py (scoreboard), model.py, train.py, bot.py (/live, /ingame)
   ...              next models follow the same pattern
 tests/             pytest tests, run automatically on GitHub for every push
 scripts/           run_bot.bat: double-click to start the bot on Windows

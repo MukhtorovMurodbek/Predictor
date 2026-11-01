@@ -9,10 +9,11 @@ Dota 2 models for a small team of students, served through one private Telegram 
 
 | Model | Folder | Data | Owner |
 |---|---|---|---|
-| 1. Counter-picker | `src/predictor/counterpick/` | **public** games; moving to last-3-months statistics (STRATZ) | Asilbek (+ Codex), also a website |
+| 1. Counter-picker | `src/predictor/counterpick/` | **public** games, plain statistics (no model), last 90 days, auto-updated hourly | Asilbek (+ Codex), also a website |
 | 2. Pro match predictor | `src/predictor/pro/` | **pro matches only** | Murodbek (+ Claude) |
 | 3. Pro draft predictor (next pick/ban) | `src/predictor/draft/` | **pro drafts only** | Murodbek (+ Claude) |
-| 4–6. Live, tournament, universal | not started | pro | see `docs/PLAN.md` |
+| 4. Live in-game predictor | `src/predictor/live/` | **pro** match timelines | Murodbek (+ Claude) |
+| 5–6. Tournament, universal | not started | pro | see `docs/PLAN.md` |
 
 Status lives in `PROGRESS.md`. The plan lives in `docs/PLAN.md`.
 
@@ -55,10 +56,12 @@ src/predictor/
   __init__.py      ROOT, DATA_DIR, RAW_DIR, MODELS_DIR paths
   data/            shared: OpenDota client, collectors (python -m predictor.data.collect ...),
                    load_matches(), resolve_heroes() (hero names like "pa", "cm")
-  counterpick/     model 1: model.py, train.py, evaluate.py, recommend.py (CLI), bot.py
+  counterpick/     model 1: stats.py (Counts per day, MatchupStats), update.py (hourly refresh),
+                   recommend.py (CLI), bot.py
   pro/             model 2: features.py (ProState), dataset.py, model.py (ProModel),
                    train.py, evaluate.py, bot.py
   draft/           model 3: features.py (DraftState), model.py (DraftModel, replay), train.py, bot.py
+  live/            model 4: features.py (scoreboard), model.py (LiveModel), train.py, bot.py
   bot/             Telegram bot: app.py, auth.py, admin.py (/collect /train /evaluate),
                    registry.py (the list of hosted models), config.py (.env)
 tests/             pytest
@@ -69,7 +72,8 @@ docs/              PLAN.md (roadmap), BOT.md (bot usage + hosting)
 
 Each model folder has a `bot.py` exposing exactly these names (see `bot/registry.py`):
 `NAME`, `TITLE`, `SUMMARY`, `help_text()`, `COMMANDS = [(command, async handler, menu text)]`,
-`status()`, `train_model() -> str` and `evaluate_model() -> str`. Then add the module to
+`status()`, `train_model() -> str` and `evaluate_model() -> str`, and optionally an async `background()`
+loop the bot starts at launch (the counter-picker uses it for hourly updates). Then add the module to
 `MODELS` in `bot/registry.py`. The bot picks up the rest by itself: the `/NAME` intro, the
 `/start` menu, `/help`, `/train NAME` and `/evaluate NAME`.
 
@@ -96,6 +100,8 @@ Bot message rules:
 ## For the website (Asilbek)
 
 Put it in its own top-level folder (e.g. `web/`) and import models from the package
-(`from predictor.counterpick import CounterModel`) instead of copying code. If the site
+(`from predictor.counterpick import MatchupStats`) instead of copying code. Note: the raw file
+`data/raw/public_matches.parquet` now only keeps the **last 7 days**. The 90-day numbers live in
+the daily tables `data/counterpick/*.npz` (`MatchupStats.from_daily(...)`). If the site
 needs an HTTP API, add a small FastAPI app under `web/` that loads the same model files.
 Don't change model file formats without updating `bot.py` too.

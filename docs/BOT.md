@@ -6,7 +6,7 @@ from Telegram, wherever they are.
 ```
  friends' phones ──► Telegram servers ◄── bot on the host laptop (polls for messages)
                                               │
-                                              ├─ counter-picker model
+                                              ├─ counter-picker statistics (updates itself hourly)
                                               ├─ (next models as we build them)
                                               └─ data/ and models/ folders
 ```
@@ -21,7 +21,7 @@ in Telegram's `/` menu.
 
 | Command | What it does |
 |---|---|
-| `/start` | Pick a model. `/counterpick`, `/pro`, `/draft` and `/admin` each explain their own commands |
+| `/start` | Pick a model. `/counterpick`, `/pro`, `/draft`, `/livepro` and `/admin` each explain their own commands |
 | `/pick pa, pudge, lion` | Best heroes to pick against those enemies |
 | `/pick pa, pudge \| cm, axe \| invoker` | Same, plus your team (after the 1st `\|`) and bans (after the 2nd) |
 | `/counters phantom assassin` | Heroes that beat this hero |
@@ -34,15 +34,18 @@ in Telegram's `/` menu.
 | `/status` | Which models are loaded, how much data, running jobs |
 | `/collect public 300` | Admin: download ~26 k public games (300 API calls ≈ 5 min) |
 | `/collect pro` | Admin: download new pro matches (+ team, league and player names) |
-| `/train counterpick` | Admin: retrain the counter-picker on all collected data |
+| `/live` | Pro games being played right now, with live win % |
+| `/ingame spirit vs liquid 25 +5k towers 3-1` | Live win % from a scoreboard you type |
+| `/train counterpick` | Admin: update the counter-picker statistics now (it also does this every hour by itself) |
+| `/train livepro` | Admin: retrain the live predictor (~3 min) |
 | `/train pro` | Admin: retrain the pro predictor (~2 min) |
 | `/train draft` | Admin: retrain the draft predictor (~4 min) |
-| `/evaluate counterpick` | Admin: accuracy on the newest games vs simple baselines |
+| `/evaluate counterpick` | Admin: how many games back the statistics |
 
 Hero names can be full (`Phantom Assassin`), partial (`phantom a`) or initials (`pa`).
 
 **A good daily routine:** `/collect pro` then `/train pro` and `/train draft` (a few minutes each), and
-`/collect public 2500` (about 45 min) then `/train counterpick`.
+nothing for the counter-picker: it downloads new public games every hour by itself.
 The model reloads by itself after training, so there's no need to restart the bot.
 
 ## Who can use it
@@ -84,9 +87,11 @@ Get some data and a model, either from the command line or later through the bot
 ```bash
 .venv\Scripts\python -m predictor.data.collect heroes
 .venv\Scripts\python -m predictor.data.collect public --calls 300
-.venv\Scripts\python -m predictor.counterpick.train
+.venv\Scripts\python -m predictor.counterpick.update
 .venv\Scripts\python -m predictor.data.collect pro
 .venv\Scripts\python -m predictor.pro.train
+.venv\Scripts\python -m predictor.draft.train
+.venv\Scripts\python -m predictor.live.train
 ```
 
 ### 2. Start it
@@ -128,5 +133,5 @@ Then start it again.
 | Bot says "private bot" to a friend | Check their username in `.env` (no @). Restart the bot after editing `.env` |
 | A friend changed their Telegram username | Still works, the bot knows their ID |
 | You *replaced* a person in `usernames` | Delete their line from `data/bot_users.json`, or delete the file |
-| "No counter-pick model yet" | `/collect public` then `/train counterpick` |
+| "No statistics yet" | `/train counterpick` (or wait for the hourly update) |
 | Bot is slow to answer while a job runs | Jobs run in the background. Only one job runs at a time |

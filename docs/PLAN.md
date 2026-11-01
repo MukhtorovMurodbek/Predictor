@@ -91,11 +91,18 @@ Each phase ends with something that works and that we can demo. Do them in order
 
 ### Phase 1 — Counter-picker (public games) ✅ hosted · 👤 Asilbek
 
-**Direction change (2026-11-01, Asilbek):** turn the counter-picker into **plain statistics
-over the last 3 months** (matchup win rates, a "dynamic script"), not a trained model. The
-best source for that is the **STRATZ API**: it already aggregates nearly all public matches
-by hero pair and rank, so no need to download matches ourselves. It needs a free token
-(stratz.com/api, log in with Steam) → put it in `.env` as `stratz_token`.
+**Now plain statistics, not a model (2026-11-01, Asilbek + Murodbek).** Done:
+- `counterpick/stats.py`: raw wins/games per hero and hero pair, kept as **one small table per
+  day**. The bot sums the **last 90 days**. Edge = real win rate in a matchup minus what the two
+  heroes' usual win rates predict (like Dotabuff's advantage). Pairs under 200 games are hidden.
+- `counterpick/update.py`, run by the bot **every hour**: fetch new public games (all ranks),
+  backfill older games until the 90-day window is full, add them to the daily tables, and keep
+  only 7 days of raw games. Leaves 400 OpenDota calls/day for the other models.
+- The old trained counter model was removed.
+- Check vs Dotabuff (Phantom Lancer, after one day of data): 8 of our top 10 counters are in
+  Dotabuff's top 14 (Tidehunter, Axe, Timbersaw, Underlord, Sand King, Warlock, CM, Sven).
+- STRATZ would give far more data at once, but its API needs an account with 100+ public
+  games. Murodbek's didn't qualify. Asilbek could create the token instead.
 
 How many games is enough? A matchup win rate from *n* games is accurate to about ±1/√n
 (95%): 1,000 games → ±3.1 points, 10,000 → ±1.0, 100,000 → ±0.3. Counter effects are usually
@@ -202,14 +209,29 @@ not heroes. That's expected in pro play.
 Next ideas: hero roles/positions, the team's last few drafts (strategies repeat within an
 event), a "live draft" view that also shows win % from model 2 after each pick.
 
-### Phase 4 — Live in-game prediction (month 2)
-- Dataset: `/api/matches/{id}` for pro matches → per-minute gold/XP diff, kills, towers, Roshan
-- Models:
-  - **Win probability by minute** (draft prior + gold/XP/kills/buildings) → live line chart
-  - **First blood team** (draft + team aggression history), **first Roshan**, **first tower**
-  - Game-length prediction
-- Real-time feed: **GSI while spectating** (best), fall back to OpenDota `/live`
-- Small local web UI (Streamlit or FastAPI + simple page) showing the live win% line
+### Phase 4 — Live in-game prediction ✅ hosted
+- [x] Data: per-minute gold/XP lead + towers, barracks, Roshan, first blood for 106,752 pro
+      matches since 2023 (OpenDota explorer, ~22 calls; `collect pro` keeps it fresh)
+- [x] Model (`live/`): one gradient-boosting model on [everything the pro model knows before
+      the game] + [minute, gold lead, gold change over 5 min, towers, barracks, Roshan, first
+      blood]. A snapshot every 2 minutes, with inputs randomly hidden in training so it still
+      works without heroes or objective counts
+- [x] Hosted: `/live` (pro games happening now, from OpenDota's live feed) and `/ingame` (type
+      a scoreboard: minute, gold lead, towers, Roshan)
+
+**Results (2026-11-01)**, 18,201 newer pro matches:
+
+| minute | live model | gold lead only | pre-game model only |
+|---|---|---|---|
+| 0–4 | **62.3%** | 56.9% | 61.2% |
+| 10–14 | **68.9%** | 67.9% | 61.1% |
+| 20–24 | **77.1%** | 76.7% | 60.2% |
+| 30–34 | **82.2%** | 81.5% | 58.5% |
+| 40+ | **77.1%** | 75.1% | 55.0% |
+
+Next ideas: kill score (in the live feed but needs kill timelines for training), decoding the
+live feed's building state, a live line chart, first blood / first Roshan / first tower models,
+and Dota's Game State Integration while spectating for a faster, richer feed.
 
 ### Phase 5 — Tournament predictor (before the next TI)
 - **Team ratings**: Elo / Glicko-2 from pro results, with roster changes and decay

@@ -1,5 +1,6 @@
 """The Telegram bot: access control, /start /help /status, and every model's commands."""
 
+import asyncio
 import functools
 import html
 import logging
@@ -124,20 +125,29 @@ def build_app(config: BotConfig) -> Application:
 
     async def post_init(app: Application) -> None:
         await app.bot.set_my_commands([BotCommand(name, desc) for name, _, desc in commands])
-        for m in MODELS.values():
-            if hasattr(m, "background"):
-                app.create_task(m.background(), name=f"{m.NAME}-background")
+        # Background loops (e.g. hourly data updates). Kept in bot_data so they aren't
+        # garbage-collected, and cancelled in post_shutdown.
+        app.bot_data["tasks"] = [
+            asyncio.get_running_loop().create_task(m.background(), name=f"{m.NAME}-background")
+            for m in MODELS.values()
+            if hasattr(m, "background")
+        ]
         await app.bot.set_my_short_description(f"{BOT_NAME}: Dota 2 counter-picks, pro match and pro draft predictions")
         me = await app.bot.get_me()
         if config.username and me.username.lower() != config.username.lower():
             log.warning("bot_username in .env is %s but the token belongs to @%s", config.username, me.username)
         log.info("@%s is running for %d allowed users. Press Ctrl+C to stop.", me.username, len(config.allowed))
 
+    async def post_shutdown(app: Application) -> None:
+        for task in app.bot_data.get("tasks", []):
+            task.cancel()
+
     app = (
         Application.builder()
         .token(config.token)
         .defaults(Defaults(parse_mode=ParseMode.HTML))
         .post_init(post_init)
+        .post_shutdown(post_shutdown)
         .build()
     )
     for name, func, _ in commands:

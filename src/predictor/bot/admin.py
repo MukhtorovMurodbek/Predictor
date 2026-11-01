@@ -22,7 +22,7 @@ log = logging.getLogger(__name__)
 MAX_PUBLIC_CALLS = 2900  # OpenDota free tier: 3000 calls/day
 
 HELP = """<b>⚙️ Admin</b> (everyone on the list can use these)
-<b>Daily refresh:</b> /collect pro → /train pro → /train draft → /train livepro, and /collect public 2500 → /train counterpick
+<b>Daily refresh:</b> /collect pro → /train pro → /train draft → /train livepro. The counter-picker updates itself every hour.
 /collect public <i>[calls]</i> — download public games, ~87 per call, 1 call/sec (default 300 ≈ 5 min)
 /collect pro — download new pro matches, drafts, timelines (+ teams, leagues)
 /collect heroes — refresh hero list and patches
