@@ -5,7 +5,7 @@
 
 Dota 2 models, all hosted through one Telegram bot: a **hero counter-picker** for regular
 games, then **pro match predictors** (draft, next pick, live game, tournament winner), and
-finally one **universal model** that does everything.
+finally a **general predictor** that answers plain English questions with all of them.
 
 - **[docs/PLAN.md](docs/PLAN.md)**: roadmap, what's done, what's next
 - **[docs/BOT.md](docs/BOT.md)**: using and hosting the Telegram bot
@@ -27,7 +27,7 @@ counter-pickers: `/counterpick` (90-day matchup edges) and `/asil` (Asilbek's ra
 | 3 | Pro draft predictor (next pick/ban) | pro drafts only | ✅ live in the bot | `/draft` `/next` |
 | 4 | Live in-game predictor | pro match timelines | ✅ live in the bot | `/livepro` `/live` `/ingame` |
 | 5 | Tournament (TI) predictor | pro model + simulated TI format | ✅ live in the bot | `/tournament` `/odds` |
-| 6 | Universal model | everything | ⬜ last | — |
+| 6 | General predictor (plain English, all models; skills test done) | everything | 🔨 idea tested | — |
 
 Each model is built, then hosted in the bot, before the next one starts.
 

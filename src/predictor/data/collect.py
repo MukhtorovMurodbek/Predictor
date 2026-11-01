@@ -15,7 +15,7 @@ import pandas as pd
 from .. import DATA_DIR, RAW_DIR
 from ..io import atomic_write
 from . import (
-    D_COLS, DRAFTS_PATH, HEROES_PATH, TIMELINES_PATH, LEAGUES_PATH, PATCHES_PATH, PLAYER_COLS, PLAYERS_PATH, R_COLS, SOURCES, TEAMS_PATH,
+    CONSTANTS_DIR, D_COLS, DRAFTS_PATH, HEROES_PATH, TIMELINES_PATH, LEAGUES_PATH, PATCHES_PATH, PLAYER_COLS, PLAYERS_PATH, R_COLS, SOURCES, TEAMS_PATH,
     patch_for_times, to_unix,
 )
 from .opendota import OpenDota, QuotaExhausted
@@ -66,6 +66,16 @@ def collect_heroes(api: OpenDota) -> None:
     HEROES_PATH.write_text(json.dumps(heroes, indent=1), "utf-8")
     PATCHES_PATH.write_text(json.dumps(api.patches(), indent=1), "utf-8")
     print(f"saved {len(heroes)} heroes and patch dates to {DATA_DIR}")
+
+
+def collect_constants(api: OpenDota) -> None:
+    """Hero base stats and every ability's description, numbers and rules (3 calls), for the
+    general predictor's skill features (general/skills.py)."""
+    CONSTANTS_DIR.mkdir(parents=True, exist_ok=True)
+    for name in ("heroes", "abilities", "hero_abilities"):
+        data = api.get(f"constants/{name}")
+        (CONSTANTS_DIR / f"{name}.json").write_text(json.dumps(data), "utf-8")
+        print(f"saved {len(data)} {name} to {CONSTANTS_DIR}")
 
 
 def _pro_rows_to_wide(rows: list[dict]) -> pd.DataFrame:
@@ -270,6 +280,7 @@ def main(argv=None):
     p = argparse.ArgumentParser(description="Collect Dota 2 match data from OpenDota")
     sub = p.add_subparsers(dest="cmd", required=True)
     sub.add_parser("heroes", help="hero list + patch dates")
+    sub.add_parser("constants", help="hero base stats + ability descriptions (general predictor)")
     drafts = sub.add_parser("drafts", help="pick/ban order of pro matches (also done by 'pro')")
     drafts.add_argument("--since", help="YYYY-MM-DD (default: continue, or 2023-01-01)")
     timelines = sub.add_parser("timelines", help="per-minute gold/XP + events of pro matches (also done by 'pro')")
@@ -285,6 +296,8 @@ def main(argv=None):
     RAW_DIR.mkdir(parents=True, exist_ok=True)
     if args.cmd == "heroes":
         collect_heroes(api)
+    elif args.cmd == "constants":
+        collect_constants(api)
     elif args.cmd == "pro":
         collect_pro(api, args.since)
     elif args.cmd == "drafts":

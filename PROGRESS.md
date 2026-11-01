@@ -59,5 +59,8 @@ _Last updated: 2026-11-01 (late night)_
 - ✅ Backtested on TI 2023–2026: winner ranked #1 twice, #3 once, #7 once (avg ~16% vs 6% random)
 - ✅ Hosted in the bot: `/tournament` `/odds`
 
-## 6. Universal model
-- ⬜ Next (last)
+## 6. General predictor (was: universal model) 👤 Murodbek + Claude
+- ✅ Idea tested: counters from hero skills alone find 15% of the real top-5 counters (random: 4%), so it works, but weakly → [details](docs/PLAN.md)
+- ✅ `general/skills.py`: skill features + the test (`python -m predictor.general.skills`)
+- ⬜ Choose the language model: Groq (free, cloud) or local (Ollama, ~2.5 GB download)
+- ⬜ `/ask` in plain English → the right model, plus "why" explanations from ability texts
